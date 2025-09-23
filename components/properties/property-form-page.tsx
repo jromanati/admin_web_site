@@ -124,10 +124,11 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
       // localStorage.setItem("properties", JSON.stringify(updated))
 
       mutate('properties', updated, false)
+      setIsLoading(true);
       setIsSending(false)
-      window.location.href = `/dashboard/properties/properties`
+      router.push(`/dashboard/properties/properties`)
     } else {
-      window.location.href = "/"
+      router.push("/")
     }
   }
   const router = useRouter()

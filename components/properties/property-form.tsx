@@ -17,10 +17,10 @@ interface PropertyFormProps {
   initialData?: Partial<Property>
   onSubmit: (data: Property) => void
   onCancel: () => void
-  isLoading?: boolean
+  isSending?: boolean
 }
 
-const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isLoading = false }: PropertyFormProps) => {
+const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = false }: PropertyFormProps) => {
   const [selectedRegion, setSelectedRegion] = useState(initialData?.region || "")
   const [availableCommunes, setAvailableCommunes] = useState<string[]>([])
   const [images, setImages] = useState<File[]>([])
@@ -510,12 +510,12 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isLoading = fa
           </button>
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={isSending}
             className={`px-4 py-2 text-sm font-medium text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 
             ${secondBackgroundColor} ${principalText} ${principalHoverBackground}
             `}
           >
-            {isLoading ? (
+            {isSending ? (
               <>
                 <div
                   className="inline-block h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"

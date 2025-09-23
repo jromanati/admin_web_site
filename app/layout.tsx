@@ -17,11 +17,11 @@ const dmSans = DM_Sans({
 })
 
 export const metadata: Metadata = {
-  title: "Home Stager AI",
+  title: "Admin Web Sites",
   description: "Mejora fotos de propiedades con IA",
   // 👇 aquí solo lo básico (sin manifest, sin themeColor)
-  applicationName: "Home Stager AI",
-  authors: [{ name: "Tu nombre o empresa" }],
+  applicationName: "Admin Web Sites",
+  authors: [{ name: "Metra´s" }],
 };
 
 export const viewport: Viewport = {

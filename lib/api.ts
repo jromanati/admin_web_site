@@ -17,6 +17,8 @@ class ApiClient {
   }
 
   private getDynamicBaseUrl(): string {
+    // NEXT_PUBLIC_API_URL=https://base.sitios.softwarelabs.cl/api/
+    const DEFAULT_API_BASE_PROD = "https://base.sitios.softwarelabs.cl/api/"
     if (typeof window === "undefined") {
       return DEFAULT_API_BASE // ⚠️ Estamos en el servidor, usa el base por defecto
     }
@@ -25,8 +27,8 @@ class ApiClient {
     // const host = window.location.hostname.includes("localhost") ? "localhost:8000" : "api.autopartes.cl"
     // return schema ? `http://${schema}.${host}/api/` : DEFAULT_API_BASE
     const host = "sitios.softwarelabs.cl"
-    console.log(schema ? `https://${schema}.${host}/api/` : DEFAULT_API_BASE)
-    return schema ? `https://${schema}.${host}/api/` : DEFAULT_API_BASE
+    console.log(schema ? `https://${schema}.${host}/api/` : DEFAULT_API_BASE_PROD)
+    return schema ? `https://${schema}.${host}/api/` : DEFAULT_API_BASE_PROD
     // const host2 = "192.168.1.81.nip.io:8000"
     // const DEFAULT_API_BASE2 = "http://base.192.168.1.81.nip.io:8000/api/"
     // console.log("Using API Base URL:", schema ? `http://${schema}.${host2}/api/` : DEFAULT_API_BASE2)

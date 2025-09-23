@@ -50,14 +50,14 @@ export enum PropertyTypeEnum {
 export enum OperationEnum {
   VENTA = "Venta",
   ARRIENDO = "Arriendo",
-  VENTA_ARRIENDO = "Venta y Arriendo",
+  // VENTA_ARRIENDO = "Venta y Arriendo",
 }
 
 export enum StateEnum {
   NUEVA = "Nueva",
   USADA = "Usada",
-  EN_CONSTRUCCION = "En Construcción",
-  PROYECTO = "Proyecto",
+  // EN_CONSTRUCCION = "En Construcción",
+  // PROYECTO = "Proyecto",
 }
 
 export enum PriceTypeEnum {

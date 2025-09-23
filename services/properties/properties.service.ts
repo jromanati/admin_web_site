@@ -72,6 +72,9 @@ export class PropertiesService {
           }
         })
       }
+      if (property.video) {
+        formData.append("video", property.video)
+      }
       const response = await apiClient.post<Property>("properties/create/", formData)
 
       if (response.success) {

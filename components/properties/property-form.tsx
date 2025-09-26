@@ -352,8 +352,8 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               placeholder="0"
             />
           </div>
-
-          <div>
+          {/* REvisar para ser configurado por tenant */}
+          {/* <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Agua</label>
             <input
               type="text"
@@ -361,7 +361,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Ej: Potable, Pozo"
             />
-          </div>
+          </div> */}
         </div>
 
         {/* Descripción y Características */}
@@ -369,13 +369,13 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
           <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
           <textarea
             {...register("description")}
-            rows={4}
+            rows={30}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             placeholder="Descripción detallada de la propiedad..."
           />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* REvisar para ser configurado por tenant */}
+        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Amenidades</label>
             <textarea
@@ -395,7 +395,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               placeholder="Ej: Vista panorámica, Cocina equipada..."
             />
           </div>
-        </div>
+        </div> */}
 
         {/* Mapa */}
         <div>

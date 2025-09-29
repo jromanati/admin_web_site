@@ -18,7 +18,7 @@ const dmSans = DM_Sans({
 
 export const metadata: Metadata = {
   title: "Admin Web Sites",
-  description: "Mejora fotos de propiedades con IA",
+  description: "Administracion",
   // 👇 aquí solo lo básico (sin manifest, sin themeColor)
   applicationName: "Admin Web Sites",
   authors: [{ name: "Metra´s" }],

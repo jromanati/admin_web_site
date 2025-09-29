@@ -117,7 +117,6 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
       }
       const propertiesResponse = await PropertiesService.getProperties()
       const fetchedProperties = propertiesResponse || []
-      console.log(fetchedProperties, 'fetchedProperties');
       return fetchedProperties.map((feature: any) => ({
         ...feature,
       }))
@@ -135,8 +134,8 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
     const matchesSearch =
       property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
       property.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = filterType === "all" || property.type === filterType
-    const matchesStatus = filterStatus === "all" || property.status === filterStatus
+    const matchesType = filterType === "all" || property.property_type === filterType
+    const matchesStatus = filterStatus === "all" || property.property_state === filterStatus
     return matchesSearch && matchesType && matchesStatus
   })
 
@@ -151,14 +150,16 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case "available":
+      case "Disponible":
         return <Badge variant="default">Disponible</Badge>
-      case "sold":
+      case "Vendida":
         return <Badge variant="secondary">Vendida</Badge>
-      case "rented":
+      case "Arrendada":
         return <Badge variant="outline">Arrendada</Badge>
-      case "reserved":
+      case "Reservada":
         return <Badge variant="destructive">Reservada</Badge>
+      case "NO_DISPONIBLE":
+        return <Badge variant="destructive">No disponible</Badge>
       default:
         return <Badge variant="outline">Desconocido</Badge>
     }
@@ -258,11 +259,12 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                     className="p-2 border border-border rounded-md bg-background min-w-[160px]"
                   >
                     <option value="all">Todos los tipos</option>
-                    <option value="casa">Casa</option>
-                    <option value="apartamento">Apartamento</option>
-                    <option value="local">Local</option>
-                    <option value="oficina">Oficina</option>
-                    <option value="terreno">Terreno</option>
+                    <option value="Casa">Casa</option>
+                    <option value="Departamento">Departamento</option>
+                    <option value="Parcela">Parcela</option>
+                    <option value="Comercial">Local</option>
+                    <option value="Oficina">Oficina</option>
+                    <option value="Terreno">Terreno</option>
                   </select>
 
                   <select
@@ -271,10 +273,11 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                     className="p-2 border border-border rounded-md bg-background min-w-[160px]"
                   >
                     <option value="all">Todos los estados</option>
-                    <option value="available">Disponible</option>
-                    <option value="sold">Vendida</option>
-                    <option value="rented">Arrendada</option>
-                    <option value="reserved">Reservada</option>
+                    <option value="Disponible">Disponible</option>
+                    <option value="Vendida">Vendida</option>
+                    <option value="Arrendada">Arrendada</option>
+                    <option value="Reservada">Reservada</option>
+                    <option value="NO_DISPONIBLE">No disponible</option>
                   </select>
                 </div>
               </div>
@@ -346,7 +349,12 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <CardDescription className="mb-3">{property.description}</CardDescription>
+                      <CardDescription 
+                      // className="mb-3"
+                      className="text-gray-600 mb-3 text-sm leading-relaxed min-h-[2.5rem] line-clamp-2 flex-grow"
+                      >
+                        {property.description}
+                      </CardDescription>
                       <div className="space-y-2">
                         {property.price && (
                           <div className="flex justify-between items-center">
@@ -375,18 +383,8 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           </div>
                         )}
                         <div className="flex justify-between items-center">
-                          <span className="text-sm text-muted-foreground">Tipo:</span>
-                          <Badge variant="outline">
-                            {property.listingType === "sale"
-                              ? "Venta"
-                              : property.listingType === "rent"
-                                ? "Arriendo"
-                                : "Venta/Arriendo"}
-                          </Badge>
-                        </div>
-                        <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">Estado:</span>
-                          {getStatusBadge(property.status)}
+                          {getStatusBadge(property.property_state)}
                         </div>
                       </div>
                     </CardContent>
@@ -406,22 +404,17 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3 className="text-base sm:text-lg font-semibold">
-                                {getTypeLabel(property.type)}
+                                {getTypeLabel(property.property_type)}
                               </h3>
-                              {getStatusBadge(property.status)}
-                              <Badge variant="outline">
-                                {property.listingType === "sale"
-                                  ? "Venta"
-                                  : property.listingType === "rent"
-                                    ? "Arriendo"
-                                    : "Venta/Arriendo"}
-                              </Badge>
+                              {getStatusBadge(property.property_state)}
                             </div>
                             <div className="flex items-center text-muted-foreground mb-2">
                               <MapPin className="h-4 w-4 mr-1" />
                               <span className="truncate">{property.address}</span>
                             </div>
-                            <p className="text-muted-foreground mb-3">{property.description}</p>
+                            <p className="text-gray-600 mb-3 text-sm leading-relaxed min-h-[2.5rem] line-clamp-2 flex-grow">
+                              {property.description}
+                            </p>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
                               <div>
                                 <span className="text-muted-foreground">Precio:</span>

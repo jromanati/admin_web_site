@@ -5,7 +5,9 @@ import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import PropertyFormComponent from "./property-form"
 import type { Property, PropertyImage } from "@/types/properties/properties"
-import { OperationEnum, StateEnum, PropertyTypeEnum, PriceTypeEnum } from "@/types/properties/properties"
+import { OperationEnum, StateEnum, PropertyTypeEnum, PriceTypeEnum,
+  PropertyStateEnum
+ } from "@/types/properties/properties"
 import { PropertiesService } from "@/services/properties/properties.service"
 import { AuthService } from "@/services/auth.service"
 import useSWR, { mutate } from "swr"
@@ -51,7 +53,6 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
 
   useEffect(() => {
     const properties = localStorage.getItem("properties")
-    console.log("properties", properties)
     if (mode === "edit" && propertyId) {
       const raw = localStorage.getItem("properties");
       if (!raw) return;
@@ -76,6 +77,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
         currency: prop.currency ?? "CLP",
         price_type: mapEnum(prop.price_type, PriceTypeEnum, "FIJO"),
         property_type: mapEnum(prop.property_type, PropertyTypeEnum, "CASA"),
+        property_state: mapEnum(prop.property_state, PropertyStateEnum, "Disponible"),
         operation:  mapEnum(prop.operation, OperationEnum, "VENTA"),
         state: mapEnum(prop.state, StateEnum, "Nueva"),
         bedrooms: numOrUndef(prop.bedrooms),

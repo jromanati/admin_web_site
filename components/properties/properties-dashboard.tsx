@@ -140,10 +140,12 @@ export function PropertiesDashboard({ siteId }: PropertiesDashboardProps) {
                     {/* Información */}
                     <div className="flex-1 text-center sm:text-left">
                       <h1 className="text-xl sm:text-2xl font-bold mb-1 break-words">
-                        {siteData?.name}
+                        {/* {siteData?.name} */}
+                        Propiedades
                       </h1>
                       <p className="text-sm sm:text-base opacity-90">
-                        {siteData?.description}
+                        {/* {siteData?.description} */}
+                        Administra y gestiona todas tus propiedades en un solo lugar
                       </p>
                     </div>
 
@@ -215,47 +217,7 @@ export function PropertiesDashboard({ siteId }: PropertiesDashboardProps) {
             </div>
 
             {/* Recent Activity and Top Properties */}
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card className="bg-white">
-                <CardHeader>
-                  <CardTitle>Actividad Reciente</CardTitle>
-                  <CardDescription>Últimas transacciones y eventos</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {recentActivity.map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{activity.title}</p>
-                          <p className="text-xs text-muted-foreground">{activity.date}</p>
-                        </div>
-                        <div className="text-right">
-                          {activity.amount > 0 && (
-                            <p className="text-sm font-medium">
-                              ${activity.amount.toLocaleString()}
-                              {activity.type === "rental" && "/mes"}
-                            </p>
-                          )}
-                          <Badge
-                            variant={
-                              activity.type === "sale" ? "default" : activity.type === "rental" ? "secondary" : "outline"
-                            }
-                          >
-                            {activity.type === "sale"
-                              ? "Venta"
-                              : activity.type === "rental"
-                                ? "Arriendo"
-                                : activity.type === "listing"
-                                  ? "Listado"
-                                  : "Consulta"}
-                          </Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
+            <div className="grid gap-1 md:grid-cols-1">
               <Card className="bg-white">
                 <CardHeader>
                   <CardTitle>Propiedades Destacadas</CardTitle>

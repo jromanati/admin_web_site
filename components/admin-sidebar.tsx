@@ -24,6 +24,7 @@ import {
   Palette,
   Star,
   Video,
+  HelpCircle
 } from "lucide-react"
 
 interface AdminSidebarProps {
@@ -288,13 +289,35 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
                     key={item.href}
                     variant={isActive ? "secondary" : "ghost"}
                     className={cn("w-full justify-start h-11", isActive && secondBackgroundColor, principalHoverBackground)}
-                    onClick={() => (handleClick(item.href))}
+                    onClick={() => handleClick(item.href)}
                   >
                     <Icon className="h-4 w-4 mr-3" />
                     {item.label}
                   </Button>
                 )
               })}
+
+              {/* Botón de ayuda solo si client_type == "properties" */}
+              {tenant_data && tenant_data.client_type === "properties" && (
+                <Button
+                  variant="ghost"
+                  className={cn("w-full justify-start h-11", principalHoverBackground)}
+                  onClick={() => window.open("http://base.localhost:3001/propiedades", "_blank")}
+                >
+                  {/* Puedes elegir otro icono de lucide si quieres (ej: HelpCircle, Info, BookOpen) */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4 mr-3"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <HelpCircle className="h-4 w-4 text-muted-foreground" />
+                  </svg>
+                  Ayuda
+                </Button>
+              )}
             </div>
           </nav>
 

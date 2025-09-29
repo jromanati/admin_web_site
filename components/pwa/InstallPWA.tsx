@@ -76,7 +76,7 @@ export default function InstallPWA() {
   return (
     <div className="fixed bottom-4 right-4 z-50 space-y-2">
       {/* Android/Chrome: botón real de instalar */}
-      {canInstallPrompt && (
+      {/* {canInstallPrompt && (
         <button
           onClick={onInstallClick}
           className="rounded-xl border px-4 py-2 bg-white/80 backdrop-blur shadow hover:shadow-lg text-sm"
@@ -84,7 +84,7 @@ export default function InstallPWA() {
         >
           Instalar aplicación
         </button>
-      )}
+      )} */}
 
       {/* iOS/Safari: banner con instrucciones */}
       {showIOSBanner && (

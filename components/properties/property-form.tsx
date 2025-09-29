@@ -7,7 +7,13 @@ import { useForm } from "react-hook-form"
 import { Save, X, Upload, Trash2, } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { regions, communes } from "@/data/adminData"
-import { OperationEnum, StateEnum, PropertyTypeEnum, PriceTypeEnum } from "@/types/properties/properties"
+import {
+  OperationEnum,
+  StateEnum,
+  PropertyTypeEnum,
+  PriceTypeEnum,
+  PropertyStateEnum
+ } from "@/types/properties/properties"
 import type { Property } from "@/types/properties/properties"
 import VideoUpload from "@/components/ui/video-upload"
 import MapEmbed from "@/components/ui/map-embed"
@@ -73,6 +79,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
       price_type: PriceTypeEnum.FIJO,
       operation: OperationEnum.VENTA,
       state: StateEnum.NUEVA,
+      property_state: PropertyStateEnum.DISPONIBLE,
       property_type: PropertyTypeEnum.CASA,
       bedrooms: undefined,
       bathrooms: undefined,
@@ -122,10 +129,13 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
   const [deletedImagePublicIds, setDeletedImagePublicIds] = useState<string[]>([])
   const removeImage = (index: number) => {
     const updatedImages = images.filter((_, i) => i !== index)
-    const imageToDelete = initialData.images[index]
-    if (imageToDelete) {
-      setDeletedImagePublicIds((prev) => [...prev, imageToDelete.public_id])
+    if (initialData){
+      const imageToDelete = initialData.images[index]
+      if (imageToDelete) {
+        setDeletedImagePublicIds((prev) => [...prev, imageToDelete.public_id])
+      }
     }
+    
     setImages(updatedImages)
     setValue("images", updatedImages)
   }
@@ -198,7 +208,9 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Estado *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Estado de la propiedad *
+            </label>
             <select
               {...register("state", { required: "El estado es requerido" })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -210,6 +222,20 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               ))}
             </select>
             {errors.state && <p className="mt-1 text-sm text-red-600">{errors.state.message}</p>}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
+            <select
+              {...register("property_state", { required: "El estado es requerido" })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              {Object.values(PropertyStateEnum).map((property_state) => (
+                <option key={property_state} value={property_state}>
+                  {property_state}
+                </option>
+              ))}
+            </select>
+            {errors.property_state && <p className="mt-1 text-sm text-red-600">{errors.property_state.message}</p>}
           </div>
         </div>
 

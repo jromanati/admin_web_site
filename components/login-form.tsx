@@ -15,6 +15,7 @@ import type { AuthCredentials, AuthResponse } from "@/types/auth"
 export function LoginForm() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [remember_me, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
@@ -45,6 +46,7 @@ export function LoginForm() {
     const credentials: AuthCredentials = {
       username: email || "",
       password: password || "",
+      remember_me: remember_me,
     }
     const response = await AuthService.authenticate(credentials)
     setTimeout(() => {
@@ -75,7 +77,7 @@ export function LoginForm() {
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Correo Electrónico</Label>
+            <Label htmlFor="email">Usuario</Label>
             <div className="relative">
               <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input
@@ -117,6 +119,17 @@ export function LoginForm() {
                 )}
               </Button>
             </div>
+          </div>
+          {/* 🔑 Checkbox de Recuérdame */}
+          <div className="flex items-center space-x-2">
+            <input
+              id="remember_me"
+              type="checkbox"
+              checked={remember_me}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <Label htmlFor="remember_me">Recuérdame en este dispositivo</Label>
           </div>
 
           {error && (

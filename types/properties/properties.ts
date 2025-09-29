@@ -24,6 +24,7 @@ export interface Property {
   price_type: PriceTypeEnum
   operation: OperationEnum
   state: StateEnum
+  property_state: PropertyStateEnum
   property_type: PropertyTypeEnum
   bedrooms?: number
   bathrooms?: number
@@ -56,8 +57,6 @@ export enum OperationEnum {
 export enum StateEnum {
   NUEVA = "Nueva",
   USADA = "Usada",
-  // EN_CONSTRUCCION = "En Construcción",
-  // PROYECTO = "Proyecto",
 }
 
 export enum PriceTypeEnum {
@@ -65,4 +64,12 @@ export enum PriceTypeEnum {
   NEGOCIABLE = "Negociable",
   DESDE = "Desde",
   CONSULTAR = "Consultar",
+}
+
+export enum PropertyStateEnum {
+  DISPONIBLE = "Disponible",
+  VENDIDA = "Vendida",
+  ARRENDADA = "Arrendada",
+  RESERVADA = "Reservada",
+  NO_DISPONIBLE = "No disponible"
 }

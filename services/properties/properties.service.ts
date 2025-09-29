@@ -75,6 +75,7 @@ export class PropertiesService {
       if (property.video) {
         formData.append("video", property.video)
       }
+      formData.append("property_state", property.property_state);
       const response = await apiClient.post<Property>("properties/create/", formData)
 
       if (response.success) {
@@ -122,6 +123,7 @@ export class PropertiesService {
       formData.append("region", property.region);
       formData.append("commune", property.commune);
       formData.append("address", property.address);
+      formData.append("property_state", property.property_state);
 
       if (property.parking !== undefined) formData.append("parking", String(property.parking));
       formData.append("storage", String(property.storage));

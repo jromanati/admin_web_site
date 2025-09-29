@@ -302,7 +302,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
                 <Button
                   variant="ghost"
                   className={cn("w-full justify-start h-11", principalHoverBackground)}
-                  onClick={() => window.open("http://base.localhost:3001/propiedades", "_blank")}
+                  onClick={() => window.open("https://help-admin-site.vercel.app/propiedades", "_blank")}
                 >
                   {/* Puedes elegir otro icono de lucide si quieres (ej: HelpCircle, Info, BookOpen) */}
                   <svg

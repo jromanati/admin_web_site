@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { Save, X, Upload, Trash2, } from "lucide-react"
+import { Save, X, Upload } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { regions, communes } from "@/data/adminData"
 import {
@@ -13,17 +13,61 @@ import {
   PropertyTypeEnum,
   PriceTypeEnum,
   PropertyStateEnum
- } from "@/types/properties/properties"
+} from "@/types/properties/properties"
 import type { Property } from "@/types/properties/properties"
 import VideoUpload from "@/components/ui/video-upload"
 import MapEmbed from "@/components/ui/map-embed"
-
 
 interface PropertyFormProps {
   initialData?: Partial<Property>
   onSubmit: (data: Property) => void
   onCancel: () => void
   isSending?: boolean
+}
+
+/** Helpers de formato */
+const addThousandDots = (intStr: string) =>
+  intStr.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
+
+/** Formatea según moneda:
+ * - allowDecimals = true (UF): miles con punto + decimales con coma (máx 2)
+ * - allowDecimals = false (CLP/USD): solo enteros con miles
+ */
+const formatAmount = (raw: string, allowDecimals: boolean) => {
+  let v = raw.replace(/[^\d,\.]/g, "") // dígitos + , .
+  if (!allowDecimals) {
+    const digits = v.replace(/\D/g, "")
+    return digits ? addThousandDots(digits) : ""
+  }
+
+  // 🔸 Si el usuario acaba de teclear el separador, mantenlo aunque no haya decimales aún
+  const endsWithSep = /[.,]$/.test(v)
+
+  // Usa el ÚLTIMO separador como decimal
+  const lastSep = Math.max(v.lastIndexOf(","), v.lastIndexOf("."))
+  let intPart = v
+  let decPart = ""
+
+  if (lastSep !== -1) {
+    intPart = v.slice(0, lastSep)
+    decPart = v.slice(lastSep + 1).replace(/\D/g, "")
+  }
+
+  intPart = intPart.replace(/\D/g, "")
+  const intFormatted = intPart ? addThousandDots(intPart) : ""
+  const decTrimmed = decPart.slice(0, 2)
+
+  if (decTrimmed) return `${intFormatted},${decTrimmed}`
+  if (endsWithSep) return `${intFormatted},` // 👈 mantener la coma visible
+  return intFormatted
+}
+
+/** Convierte string formateado a número JS (para backend) */
+const parseAmountToNumber = (formatted: string) => {
+  // "1.234.567,89" -> "1234567.89"
+  const n = formatted.replace(/\./g, "").replace(",", ".")
+  const parsed = Number(n)
+  return Number.isFinite(parsed) ? parsed : 0
 }
 
 const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = false }: PropertyFormProps) => {
@@ -36,20 +80,22 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
   const [principalHoverBackground, setPrincipalHoverBackground] = useState("")
   const [secondHoverBackground, setSecondHoverBackground] = useState("")
   const [principalHoverText, setPrincipalHoverText] = useState("")
+
   useEffect(() => {
-      if (initialData && initialData.video){
-        setVideo(initialData.video || null)
-      }
-      const rawUserData = localStorage.getItem("user_data")
-      const rawClientData = localStorage.getItem("tenant_data")
-      const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
-      if (tenant_data.styles_site){
-        setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
-        setPrincipalText(tenant_data.styles_site.principal_text)
-        setPrincipalHoverBackground(tenant_data.styles_site.principal_hover_background)
-        setSecondHoverBackground(tenant_data.styles_site.second_hover_background)
-        setPrincipalHoverText(tenant_data.styles_site.principal_hover_text)
-      }
+    if (initialData && initialData.video){
+      setVideo(initialData.video || null)
+    }
+    const rawUserData = localStorage.getItem("user_data")
+    const rawClientData = localStorage.getItem("tenant_data")
+    // FIX: antes parseabas rawClientData usando rawUserData
+    const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
+    if (tenant_data?.styles_site){
+      setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
+      setPrincipalText(tenant_data.styles_site.principal_text)
+      setPrincipalHoverBackground(tenant_data.styles_site.principal_hover_background)
+      setSecondHoverBackground(tenant_data.styles_site.second_hover_background)
+      setPrincipalHoverText(tenant_data.styles_site.principal_hover_text)
+    }
   }, [])
 
   const {
@@ -74,7 +120,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
       description: "",
       amenities: "",
       characteristics: "",
-      price: undefined,
+      price: undefined, // lo convertiremos de string formateado a número en onSubmit
       currency: "CLP",
       price_type: PriceTypeEnum.FIJO,
       operation: OperationEnum.VENTA,
@@ -93,6 +139,10 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
       ...initialData,
     },
   })
+
+  // currency y price (string formateado) para reaccionar a cambios
+  const currency = watch("currency") as "CLP" | "USD" | "UF" | undefined
+  const allowDecimals = currency === "UF"
 
   // Actualizar comunas cuando cambia la región
   useEffect(() => {
@@ -130,24 +180,93 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
   const removeImage = (index: number) => {
     const updatedImages = images.filter((_, i) => i !== index)
     if (initialData){
-      const imageToDelete = initialData.images[index]
-      if (imageToDelete) {
+      // @ts-ignore (si tu tipo de imagen incluye public_id en edición)
+      const imageToDelete = initialData.images?.[index]
+      if (imageToDelete?.public_id) {
         setDeletedImagePublicIds((prev) => [...prev, imageToDelete.public_id])
       }
     }
-    
     setImages(updatedImages)
-    setValue("images", updatedImages)
+    // @ts-ignore: si tu Property.images es File[] en creación, mantenlo así
+    setValue("images", updatedImages as any)
   }
 
   const onFormSubmit = (data: Property) => {
-    onSubmit({ ...data, images, deletedImagePublicIds, video })
+    // data.price aquí puede venir como string formateado (porque input es text)
+    // Aseguramos convertir a number para el backend
+    const rawPrice = (data as any).price as unknown as string | number | undefined
+    let priceNumber: number | undefined = undefined
+    if (typeof rawPrice === "string") {
+      priceNumber = parseAmountToNumber(rawPrice)
+    } else if (typeof rawPrice === "number") {
+      priceNumber = rawPrice
+    }
+
+    // Validación no negativa
+    if (priceNumber !== undefined && priceNumber < 0) {
+      // Si usas toast, podrías mostrar error. Aquí simple early-return.
+      return
+    }
+
+    onSubmit({
+      ...data,
+      // fuerza precio como number
+      price: priceNumber as any,
+      images,
+      deletedImagePublicIds,
+      video
+    } as Property)
   }
+
+  const allowDecimalKey = (e: React.KeyboardEvent<HTMLInputElement>, allowDecimals: boolean) => {
+    const ctrlCmd = e.ctrlKey || e.metaKey
+    const navigation = ["Backspace","Delete","ArrowLeft","ArrowRight","Home","End","Tab","Escape","Enter"]
+    const isDigit = /^[0-9]$/.test(e.key)
+    const isSeparator = allowDecimals && (e.key === "," || e.key === "." || e.key === "Decimal")
+    console.log(e.key, isSeparator, allowDecimals)
+
+    if (ctrlCmd) return // permitir copiar/pegar, deshacer, etc.
+    if (navigation.includes(e.key)) return
+    if (isDigit) return
+    if (isSeparator) return
+    console.log("Blocked key:", e.key)
+    // bloquear cualquier otra tecla
+    e.preventDefault()
+  }
+
+  /** Handler onChange del precio con mantenimiento de caret */
+  const handlePriceChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    const input = e.target
+    const before = input.value
+    const caret = input.selectionStart ?? before.length
+    const formatted = formatAmount(before, allowDecimals)
+
+    // Asignar al input visible
+    input.value = formatted
+
+    // Actualizar react-hook-form internamente
+    setValue("price" as any, formatted as any, { shouldValidate: true })
+
+    // Mantener caret en posición razonable
+    const diff = formatted.length - before.length
+    const newPos = Math.max(0, caret + diff)
+    requestAnimationFrame(() => input.setSelectionRange(newPos, newPos))
+  }
+
+  // Si cambias de moneda, re-formatea lo que haya escrito
+  useEffect(() => {
+    const el = document.querySelector<HTMLInputElement>('input[name="price"]')
+    if (!el) return
+    const formatted = formatAmount(el.value || "", allowDecimals)
+    el.value = formatted
+    setValue("price" as any, formatted as any, { shouldValidate: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowDecimals])
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">{initialData ? "Editar Propiedad" : "Nueva Propiedad"}</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{initialData?.title ? "Editar Propiedad" : "Nueva Propiedad"}</h2>
       </div>
 
       <form onSubmit={handleSubmit(onFormSubmit)} className="p-6 space-y-6">
@@ -242,16 +361,6 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
         {/* Precio */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Precio</label>
-            <input
-              type="number"
-              {...register("price", { min: 0 })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="0"
-            />
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Moneda</label>
             <select
               {...register("currency")}
@@ -261,6 +370,29 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               <option value="USD">USD</option>
               <option value="UF">UF</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Precio</label>
+            <input
+              type="text"
+              inputMode={allowDecimals ? "decimal" : "numeric"}
+              placeholder={allowDecimals ? "0,00" : "0"}
+              {...register("price" as any, {
+                validate: (v: any) => {
+                  const num = typeof v === "number" ? v : parseAmountToNumber(String(v || ""))
+                  if (num < 0) return "El precio no puede ser negativo"
+                  return true
+                },
+              })}
+              onKeyDown={(e) => allowDecimalKey(e, allowDecimals)}   // 👈 aquí
+              onChange={handlePriceChange}
+              onBlur={(e) => {
+                e.target.value = formatAmount(e.target.value, allowDecimals)
+                setValue("price" as any, e.target.value as any, { shouldValidate: true })
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            {errors.price && <p className="mt-1 text-sm text-red-600">{String(errors.price.message)}</p>}
           </div>
 
           <div>
@@ -328,7 +460,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
         {/* Características */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Dormitorios</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Habitaciones</label>
             <input
               type="number"
               {...register("bedrooms", { min: 0 })}
@@ -378,19 +510,9 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               placeholder="0"
             />
           </div>
-          {/* REvisar para ser configurado por tenant */}
-          {/* <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Agua</label>
-            <input
-              type="text"
-              {...register("water")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              placeholder="Ej: Potable, Pozo"
-            />
-          </div> */}
         </div>
 
-        {/* Descripción y Características */}
+        {/* Descripción */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
           <textarea
@@ -400,32 +522,10 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
             placeholder="Descripción detallada de la propiedad..."
           />
         </div>
-        {/* REvisar para ser configurado por tenant */}
-        {/* <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Amenidades</label>
-            <textarea
-              {...register("amenities")}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              placeholder="Ej: Piscina, Gimnasio, Quincho..."
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Características</label>
-            <textarea
-              {...register("characteristics")}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              placeholder="Ej: Vista panorámica, Cocina equipada..."
-            />
-          </div>
-        </div> */}
 
         {/* Mapa */}
         <div>
-           <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación en Google Maps</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación en Google Maps</label>
           <p className="text-sm text-gray-500 mb-4">
             Busca la dirección o pega el código iframe de Google Maps para mostrar la ubicación
           </p>
@@ -455,8 +555,9 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {images.map((image, index) => (
                   <div key={index} className="relative">
+                    {/* @ts-ignore: image puede venir con .url en edición */}
                     <img
-                      src={image.url ? image.url : URL.createObjectURL(image)}
+                      src={(image as any).url ? (image as any).url : URL.createObjectURL(image)}
                       alt={`Producto ${index + 1}`}
                       className="w-full h-32 object-cover rounded-lg border"
                     />
@@ -475,6 +576,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
             )}
           </div>
         </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">Video de la Propiedad</label>
           <p className="text-sm text-gray-500 mb-4">
@@ -489,7 +591,6 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
             maxSize={150}
           />
         </div>
-
 
         {/* Opciones */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

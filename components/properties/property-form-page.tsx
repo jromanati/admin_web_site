@@ -91,6 +91,39 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
         video: prop.video_url ?? null,
       });
     }
+    else{
+      setInitialData({
+        title: "",
+        code:  "",
+        published: true,
+        featured: false,
+        show_map: true,
+        map_src: "",
+        built_area: 0,
+        land_area: 0,
+        electricity: false,
+        water:  "",
+        description: "",
+        amenities: "",
+        characteristics: "",
+        price: 0,
+        currency: "CLP",
+        price_type: "Fijo",
+        property_type: "Casa",
+        property_state: "Disponible",
+        operation:  "Venta",
+        state: "Nueva",
+        bedrooms: 0,
+        bathrooms: 0,
+        region: "",
+        commune: "",
+        address: "",
+        parking: 0,
+        storage: false,
+        images: [],
+        video: null,
+      });
+    }
   }, [mode, propertyId])
 
   const handleSubmit = async (data: React.FormEvent) => {

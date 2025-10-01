@@ -168,4 +168,16 @@ export class PropertiesService {
     return response
   }
 
+  static async changePublishedProperty(id:number): Promise<ApiResponse<Property>> {
+    const response = await apiClient.get<Property>(`properties/${id}/active/`)
+    if (response.success) {
+      return response
+    }
+    else if (response.error) {
+      console.error("Error creating:", response.error)
+      return response
+    }
+    return response
+  }
+
 }

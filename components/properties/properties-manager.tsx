@@ -5,7 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Plus, Edit, Trash2, Building, Search, MapPin, LayoutGrid, List } from "lucide-react"
+import { 
+  AlertTriangle, Plus, Edit, Trash2, Building, Search, MapPin, LayoutGrid, List, 
+  Eye, EyeClosed, EyeOff
+} from "lucide-react"
 import {
   Pagination,
   PaginationContent,
@@ -176,10 +179,6 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
     return types[type as keyof typeof types] || type
   }
 
-  // const handleDeleteProperty = (propertyId: string) => {
-  //   // Implement delete logic here
-  //   setProperties(properties.filter((property) => property.id !== propertyId))
-  // }
   const handleDeleteProperty = (property: Property) => {
     setPropertyToDelete(property)
   }
@@ -196,11 +195,150 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
     }
   }
 
+  const changePublishedProperty = async (propertyId: number) => {
+    const response = await PropertiesService.changePublishedProperty(propertyId)
+
+    if (response?.success && response.data) {
+      const updatedProperty: Property = response.data
+
+      mutate(
+        "properties",
+        (current: Property[] | undefined) => {
+          // Toma el listado actual de SWR o, si no existe, desde localStorage
+          const list: Property[] =
+            current ??
+            (JSON.parse(localStorage.getItem("properties") || "[]") as Property[])
+
+          const idx = list.findIndex((p) => p.id === Number(updatedProperty.id))
+
+          let updated: Property[]
+          if (idx >= 0) {
+            // Reemplaza manteniendo el orden (merge por seguridad)
+            updated = [...list]
+            updated[idx] = { ...list[idx], ...updatedProperty }
+          } else {
+            // Si no estaba, lo insertamos al inicio (o al final según tu UX)
+            updated = [updatedProperty, ...list]
+          }
+
+          localStorage.setItem("properties", JSON.stringify(updated))
+          return updated
+        },
+        false // sin revalidar ahora
+      )
+
+      // (Opcional) si tienes un cache por propiedad, sincronízalo también:
+      // mutate(["property", propertyId], updatedProperty, false)
+    }
+  }
+
   const confirmDeleteUser = () => {
     if (propertyToDelete) {
       setPropertyToDelete(null)
       deleteProperty(propertyToDelete.id)
     }
+  }
+
+  type Currency = "CLP" | "USD" | "UF"
+
+  /** Convierte a número detectando correctamente el separador decimal:
+   * - "2000000.00"  -> 2000000   (punto decimal)
+   * - "1.234,56"    -> 1234.56   (formato chileno)
+   * - "15,5" / "15.5" -> 15.5
+   */
+  const toNumberSmart = (v: number | string, currency: Currency) => {
+    if (typeof v === "number") return v
+    const s = String(v || "").trim()
+    if (!s) return 0
+
+    // Caso: solo punto y actúa como decimal (p. ej. "2000000.00", "15.5")
+    const isDotDecimal = !s.includes(",") && /^\d+\.\d{1,6}$/.test(s)
+    if (isDotDecimal) return Number(s)
+
+    // Regla chilena: "." miles, "," decimal
+    const normalized = s.replace(/\./g, "").replace(",", ".")
+    const n = Number(normalized)
+    return Number.isFinite(n) ? n : 0
+  }
+
+  /** Cuenta los decimales del valor de entrada para respetarlos en la salida (máx 2) */
+  const countInputDecimals = (v: number | string) => {
+    if (typeof v === "number") {
+      const s = String(v)
+      const i = s.indexOf(".")
+      return i === -1 ? 0 : Math.min(2, s.length - i - 1)
+    }
+    const s = String(v)
+    // "2000000.00" → 2 ; "15.5" → 1
+    if (!s.includes(",") && /^\d+\.\d{1,6}$/.test(s)) return Math.min(s.split(".")[1].length, 2)
+    // "1.234,56" → 2 ; "15,5" → 1
+    return Math.min((s.split(",")[1]?.length ?? 0), 2)
+  }
+  const formatPrice = (
+    value: number | string,
+    currency: Currency = "CLP",
+    opts: {
+      decimals?: number | "auto"
+      showCode?: boolean
+      codePosition?: "prefix" | "suffix"
+      inputMinorUnitFactor?: number
+    } = {}
+  ) => {
+    const {
+      decimals = "auto",
+      showCode = true,
+      codePosition = "prefix",
+      inputMinorUnitFactor,
+    } = opts
+
+    let nRaw = toNumberSmart(value, currency)
+
+    // 🔎 Corrección automática común: CLP en centavos (x100)
+    // Si no especificaste inputMinorUnitFactor, intentamos detectar el caso típico:
+    // entero grande, divisible por 100, sin separadores en el string de origen,
+    // y en un rango razonable (>= 100.000.000).
+    if (currency === "CLP") {
+      const s = typeof value === "string" ? value.trim() : ""
+      const looksPlainIntegerString = s && /^[0-9]+$/.test(s)
+      const autoLooksLikeCents =
+        inputMinorUnitFactor == null &&
+        Number.isInteger(nRaw) &&
+        nRaw % 100 === 0 &&
+        nRaw >= 100_000_000 && // 100 millones
+        (looksPlainIntegerString || typeof value === "number")
+
+      const factor = inputMinorUnitFactor ?? (autoLooksLikeCents ? 100 : 1)
+      if (factor !== 1) nRaw = nRaw / factor
+    }
+
+    const decs = decimals === "auto" ? countInputDecimals(value) : decimals
+
+    if (currency === "UF") {
+      const nf = new Intl.NumberFormat("es-CL", {
+        style: "currency",
+        currency: "CLF",
+        currencyDisplay: "code",
+        minimumFractionDigits: decs,
+        maximumFractionDigits: decs,
+      })
+      const parts = nf.formatToParts(nRaw)
+      const numberOnly = parts
+        .filter((p) => p.type !== "currency")
+        .map((p) => p.value)
+        .join("")
+        .trim()
+
+      if (!showCode) return numberOnly
+      return codePosition === "suffix" ? `${numberOnly} UF` : `UF ${numberOnly}`
+    }
+
+    // CLP / USD
+    return new Intl.NumberFormat("es-CL", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: decs,
+      maximumFractionDigits: decs,
+    }).format(nRaw)
   }
 
   return (
@@ -341,6 +479,17 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
+                            variant="ghost" size="sm"
+                            onClick={() => changePublishedProperty(property.id)}
+                            title="Activar/Desactivar" aria-label="Activar/Desactivar"
+                          >
+                            {property.published ? (
+                              <Eye className="h-4 w-4" />
+                            ) : (
+                              <EyeOff className="h-4 w-4" />
+                            )}
+                          </Button>
+                          <Button 
                             variant="ghost" size="sm" onClick={() => handleDeleteProperty(property)}
                           >
                             <Trash2 className="h-4 w-4" />
@@ -360,7 +509,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground">Precio:</span>
                             <span className="font-semibold">
-                              ${property.price.toLocaleString()}
+                              {formatPrice(property.price ?? 0, (property.currency as Currency) || "CLP")}
                               {property.listingType === "rent" && "/mes"}
                             </span>
                           </div>
@@ -416,13 +565,15 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                               {property.description}
                             </p>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
+                              {property.price && (
                               <div>
                                 <span className="text-muted-foreground">Precio:</span>
                                 <div className="font-semibold">
-                                  ${property.price.toLocaleString()}
+                                  {formatPrice(property.price ?? 0, (property.currency as Currency) || "CLP")}
                                   {property.listingType === "rent" && "/mes"}
                                 </div>
                               </div>
+                              )}
                               <div>
                                 <span className="text-muted-foreground">Área:</span>
                                 <div>{property.area} m²</div>

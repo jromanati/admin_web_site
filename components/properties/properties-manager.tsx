@@ -119,6 +119,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
         if (!isRefreshValid)window.location.href = "/"
       }
       const propertiesResponse = await PropertiesService.getProperties()
+      console.log(propertiesResponse)
       const fetchedProperties = propertiesResponse || []
       return fetchedProperties.map((feature: any) => ({
         ...feature,

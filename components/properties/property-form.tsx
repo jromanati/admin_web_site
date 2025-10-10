@@ -29,45 +29,101 @@ interface PropertyFormProps {
 const addThousandDots = (intStr: string) =>
   intStr.replace(/\B(?=(\d{3})+(?!\d))/g, ".")
 
-/** Formatea según moneda:
+/** Formatea visualmente el input:
  * - allowDecimals = true (UF): miles con punto + decimales con coma (máx 2)
  * - allowDecimals = false (CLP/USD): solo enteros con miles
+ * - No "mueve" decimales si el usuario no ingresó separador
+ * - No confunde el punto de miles con decimal al re-formatear ("1.890" se mantiene, no "1,89")
  */
 const formatAmount = (raw: string, allowDecimals: boolean) => {
-  let v = raw.replace(/[^\d,\.]/g, "") // dígitos + , .
+  // Mantén solo dígitos y separadores , .
+  let v = (raw || "").replace(/[^\d,\.]/g, "")
+
   if (!allowDecimals) {
+    // Solo enteros (CLP/USD)
     const digits = v.replace(/\D/g, "")
     return digits ? addThousandDots(digits) : ""
   }
 
-  // 🔸 Si el usuario acaba de teclear el separador, mantenlo aunque no haya decimales aún
+  const hasComma = v.includes(",")
+  const hasDot = v.includes(".")
   const endsWithSep = /[.,]$/.test(v)
 
-  // Usa el ÚLTIMO separador como decimal
-  const lastSep = Math.max(v.lastIndexOf(","), v.lastIndexOf("."))
-  let intPart = v
-  let decPart = ""
-
-  if (lastSep !== -1) {
-    intPart = v.slice(0, lastSep)
-    decPart = v.slice(lastSep + 1).replace(/\D/g, "")
+  // Caso especial: termina en punto -> mostrar coma colgante (ej. "13." -> "13,")
+  if (!hasComma && /\.$/.test(v)) {
+    const intDigits = v.slice(0, -1).replace(/\D/g, "")
+    const intFormatted = intDigits ? addThousandDots(intDigits) : ""
+    return `${intFormatted},`
   }
 
-  intPart = intPart.replace(/\D/g, "")
-  const intFormatted = intPart ? addThousandDots(intPart) : ""
-  const decTrimmed = decPart.slice(0, 2)
+  // 1) Si hay COMA, la coma es decimal
+  if (hasComma) {
+    const last = v.lastIndexOf(",")
+    const intPart = v.slice(0, last)
+    const decPart = v.slice(last + 1)
 
-  if (decTrimmed) return `${intFormatted},${decTrimmed}`
-  if (endsWithSep) return `${intFormatted},` // 👈 mantener la coma visible
-  return intFormatted
+    const intDigits = intPart.replace(/\D/g, "")
+    const intFormatted = intDigits ? addThousandDots(intDigits) : ""
+
+    const decDigits = decPart.replace(/\D/g, "").slice(0, 2)
+
+    if (decDigits) return `${intFormatted},${decDigits}`
+    if (endsWithSep) return `${intFormatted},` // coma colgante
+    return intFormatted
+  }
+
+  // 2) No hay coma. ¿El punto actúa como decimal?
+  // Consideramos decimal SÓLO si la parte posterior al ÚLTIMO punto tiene 1-2 dígitos.
+  if (hasDot) {
+    const last = v.lastIndexOf(".")
+    const after = v.slice(last + 1).replace(/\D/g, "")
+    const before = v.slice(0, last)
+
+    const isDecimalDot = after.length > 0 && after.length <= 2
+    if (isDecimalDot) {
+      const intDigits = before.replace(/\D/g, "")
+      const intFormatted = intDigits ? addThousandDots(intDigits) : ""
+      const decDigits = after.slice(0, 2)
+      return decDigits ? `${intFormatted},${decDigits}` : intFormatted
+    }
+  }
+
+  // 3) Todos los puntos son miles (ej. "1.890" -> "1.890")
+  const digits = v.replace(/\D/g, "")
+  return digits ? addThousandDots(digits) : ""
 }
 
-/** Convierte string formateado a número JS (para backend) */
+/** Convierte string formateado a número JS (robusto):
+ * - Si tiene coma: "." se asume miles y "," decimal.
+ * - Si NO tiene coma pero tiene un único punto con 1-2 decimales: "." es decimal.
+ * - Si no hay separador: entero.
+ */
 const parseAmountToNumber = (formatted: string) => {
-  // "1.234.567,89" -> "1234567.89"
-  const n = formatted.replace(/\./g, "").replace(",", ".")
-  const parsed = Number(n)
-  return Number.isFinite(parsed) ? parsed : 0
+  const s = String(formatted || "").trim()
+  if (!s) return 0
+  if (s.includes(",")) {
+    // Formato chileno
+    const n = s.replace(/\./g, "").replace(",", ".")
+    return Number(n) || 0
+  }
+  // Sin coma: ¿punto decimal?
+  if (/^\d+\.\d{1,2}$/.test(s)) {
+    return Number(s) || 0
+  }
+  // Entero sin separadores o con puntos como miles
+  return Number(s.replace(/\./g, "")) || 0
+}
+
+/** Formatea un número para mostrarlo en el input acorde a allowDecimals */
+const formatNumberForInput = (num: number, allowDecimals: boolean) => {
+  const s = String(num)
+  const decimals = allowDecimals
+    ? Math.min((s.split(".")[1]?.length ?? 0), 2)
+    : 0
+  return new Intl.NumberFormat("es-CL", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(num)
 }
 
 const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = false }: PropertyFormProps) => {
@@ -85,9 +141,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     if (initialData && initialData.video){
       setVideo(initialData.video || null)
     }
-    const rawUserData = localStorage.getItem("user_data")
     const rawClientData = localStorage.getItem("tenant_data")
-    // FIX: antes parseabas rawClientData usando rawUserData
     const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
     if (tenant_data?.styles_site){
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -158,9 +212,24 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     if (initialData) {
       reset(initialData)
       setSelectedRegion(initialData.region || "")
-      setImages(initialData.images || [])
+      setImages((initialData.images as any) || [])
     }
   }, [initialData, reset])
+
+  // Si initialData.price existe, formatearlo para el input según moneda actual
+  useEffect(() => {
+    if (initialData?.price != null) {
+      const num =
+        typeof initialData.price === "number"
+          ? initialData.price
+          : parseAmountToNumber(String(initialData.price))
+      const formatted = formatNumberForInput(num, allowDecimals)
+      setValue("price" as any, formatted as any, { shouldValidate: true })
+      const el = document.querySelector<HTMLInputElement>('input[name="price"]')
+      if (el) el.value = formatted
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allowDecimals, initialData?.price])
 
   const handleRegionChange = (region: string) => {
     setSelectedRegion(region)
@@ -218,19 +287,18 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     } as Property)
   }
 
+  // Permitir dígitos, navegación, copy/paste y separador decimal si corresponde
   const allowDecimalKey = (e: React.KeyboardEvent<HTMLInputElement>, allowDecimals: boolean) => {
     const ctrlCmd = e.ctrlKey || e.metaKey
     const navigation = ["Backspace","Delete","ArrowLeft","ArrowRight","Home","End","Tab","Escape","Enter"]
     const isDigit = /^[0-9]$/.test(e.key)
-    const isSeparator = allowDecimals && (e.key === "," || e.key === "." || e.key === "Decimal")
-    console.log(e.key, isSeparator, allowDecimals)
-
-    if (ctrlCmd) return // permitir copiar/pegar, deshacer, etc.
+    const isSeparator = allowDecimals && (
+      e.key === "," || e.key === "." || e.key === "Decimal" || e.code === "NumpadDecimal"
+    )
+    if (ctrlCmd) return
     if (navigation.includes(e.key)) return
     if (isDigit) return
     if (isSeparator) return
-    console.log("Blocked key:", e.key)
-    // bloquear cualquier otra tecla
     e.preventDefault()
   }
 
@@ -251,6 +319,21 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     const diff = formatted.length - before.length
     const newPos = Math.max(0, caret + diff)
     requestAnimationFrame(() => input.setSelectionRange(newPos, newPos))
+  }
+
+  // Manejar pegado (paste) para normalizar contenido
+  const handlePricePaste: React.ClipboardEventHandler<HTMLInputElement> = (e) => {
+    e.preventDefault()
+    const pasted = e.clipboardData.getData("text")
+    const input = e.currentTarget
+    const start = input.selectionStart ?? 0
+    const end = input.selectionEnd ?? 0
+    const nextRaw = input.value.slice(0, start) + pasted + input.value.slice(end)
+    const formatted = formatAmount(nextRaw, allowDecimals)
+    input.value = formatted
+    setValue("price" as any, formatted as any, { shouldValidate: true })
+    const pos = formatted.length
+    requestAnimationFrame(() => input.setSelectionRange(pos, pos))
   }
 
   // Si cambias de moneda, re-formatea lo que haya escrito
@@ -384,8 +467,9 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
                   return true
                 },
               })}
-              onKeyDown={(e) => allowDecimalKey(e, allowDecimals)}   // 👈 aquí
+              onKeyDown={(e) => allowDecimalKey(e, allowDecimals)}
               onChange={handlePriceChange}
+              onPaste={handlePricePaste}
               onBlur={(e) => {
                 e.target.value = formatAmount(e.target.value, allowDecimals)
                 setValue("price" as any, e.target.value as any, { shouldValidate: true })
@@ -490,6 +574,17 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
           </div>
 
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Bodega</label>
+            <input
+              type="checkbox"
+              {...register("storage")}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+          </div>         
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Área Construida (m²)</label>
             <input
               type="number"
@@ -498,9 +593,6 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
               placeholder="0"
             />
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Área de Terreno (m²)</label>
             <input
@@ -629,8 +721,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
             onClick={onCancel}
             className={`
               px-4 py-2 text-sm font-medium border border-gray-300 rounded-lg  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500
-              ${secondBackgroundColor} ${principalText} ${principalHoverBackground}`
-            }
+              ${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
           >
             <X className="h-4 w-4 mr-2 inline" />
             Cancelar

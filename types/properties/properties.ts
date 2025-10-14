@@ -41,11 +41,16 @@ export interface Property {
 export enum PropertyTypeEnum {
   CASA = "Casa",
   DEPARTAMENTO = "Departamento",
-  LOCAL = "Local",
+  DEPARTAMENTO_AMOBLADO = "Departamento amoblado",
+  COMERCIAL = "Comercial",              // 👈 value del back
+  NEGOCIO = "Negocio",
   OFICINA = "Oficina",
-  TERRENO = "Terreno",
-  BODEGA = "Bodega",
   PARCELA = "Parcela",
+  RESIDENCIAL = "Residencial",          // 👈 igual que el back (si fue typo, así lo reflejamos)
+  PROPIEDAD = "Propiedad",
+  BODEGA = "Bodega",
+  ESTACIONAMIENTO = "Estacionamiento",
+  TERRENO = "Terreno",
 }
 
 export enum OperationEnum {

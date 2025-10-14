@@ -50,6 +50,26 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
     const hit = Object.keys(dict).find(k => k.toLowerCase() === key);
     return hit ? dict[hit] : fallback;
   };
+  function mapEnumValue<
+    T extends Record<string, string>,
+    K extends keyof T = keyof T
+  >(input: string | undefined | null, Enum: T, fallbackKey: K): T[K] {
+    if (!input) return Enum[fallbackKey]
+
+    // 1) Si viene la clave del enum (p. ej. "DEPARTAMENTO_AMOBLADO")
+    if (input in Enum) {
+      return Enum[input as keyof T]
+    }
+
+    // 2) Si viene el valor del enum (p. ej. "Departamento amoblado")
+    const foundValue = (Object.values(Enum) as string[]).find(
+      (v) => v.toLowerCase() === String(input).toLowerCase()
+    )
+    if (foundValue) return foundValue as T[K]
+
+    // 3) Fallback
+    return Enum[fallbackKey]
+  }
 
   useEffect(() => {
     const properties = localStorage.getItem("properties")
@@ -59,6 +79,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
       const list: any[] = JSON.parse(raw);
       const prop = list.find(p => String(p.id) === String(propertyId));
       if (!prop) return;
+      console.log(prop.property_type)
       setInitialData({
         title: prop.title ?? "",
         code: prop.code ?? "",
@@ -76,7 +97,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
         price: numOrUndef(prop.price),
         currency: prop.currency ?? "CLP",
         price_type: mapEnum(prop.price_type, PriceTypeEnum, "FIJO"),
-        property_type: mapEnum(prop.property_type, PropertyTypeEnum, "CASA"),
+        property_type: mapEnumValue(prop.property_type, PropertyTypeEnum, "CASA"),
         property_state: mapEnum(prop.property_state, PropertyStateEnum, "Disponible"),
         operation:  mapEnum(prop.operation, OperationEnum, "VENTA"),
         state: mapEnum(prop.state, StateEnum, "Nueva"),

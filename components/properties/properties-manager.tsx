@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { 
   AlertTriangle, Plus, Edit, Trash2, Building, Search, MapPin, LayoutGrid, List, 
-  Eye, EyeClosed, EyeOff
+  Eye, EyeOff
 } from "lucide-react"
 import {
   Pagination,
@@ -18,6 +18,7 @@ import {
   PaginationNext,
 } from "@/components/ui/pagination"
 import type { Property } from "@/types/properties/properties"
+import { PropertyTypeEnum } from "@/types/properties/properties" // 👈 importa el enum como valor (runtime)
 import { PropertiesService } from "@/services/properties/properties.service"
 import { AuthService } from "@/services/auth.service"
 import useSWR, { mutate } from "swr"
@@ -30,58 +31,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-
-const mockProperties: Property[] = [
-  {
-    id: "1",
-    address: "Av. Principal 123, Zona Norte",
-    type: "casa",
-    price: 350000,
-    area: 180,
-    bedrooms: 3,
-    bathrooms: 2,
-    status: "available",
-    description: "Hermosa casa en zona residencial con jardín",
-    features: ["Jardín", "Garaje", "Piscina"],
-    listingType: "sale",
-  },
-  {
-    id: "2",
-    address: "Centro Comercial 456, Centro",
-    type: "local",
-    price: 2500,
-    area: 85,
-    status: "rented",
-    description: "Local comercial en zona de alto tráfico",
-    features: ["Vitrina", "Baño", "Depósito"],
-    listingType: "rent",
-  },
-  {
-    id: "3",
-    address: "Residencial Norte 789, Zona Norte",
-    type: "apartamento",
-    price: 180000,
-    area: 95,
-    bedrooms: 2,
-    bathrooms: 1,
-    status: "sold",
-    description: "Apartamento moderno con vista panorámica",
-    features: ["Balcón", "Ascensor", "Seguridad"],
-    listingType: "sale",
-  },
-  {
-    id: "4",
-    address: "Plaza Central 321, Centro",
-    type: "oficina",
-    price: 1800,
-    area: 120,
-    bathrooms: 2,
-    status: "available",
-    description: "Oficina ejecutiva en edificio corporativo",
-    features: ["Aire acondicionado", "Internet", "Recepción"],
-    listingType: "rent",
-  },
-]
+// Opcional: mock si lo necesitas localmente (no se usa con SWR)
+// const mockProperties: Property[] = [ ... ]
 
 interface PropertiesManagerProps {
   siteId: string
@@ -89,7 +40,7 @@ interface PropertiesManagerProps {
 
 export function PropertiesManager({ siteId }: PropertiesManagerProps) {
   const [searchTerm, setSearchTerm] = useState("")
-  const [filterType, setFilterType] = useState<string>("all")
+  const [filterType, setFilterType] = useState<string>("all") // guardamos la CLAVE del enum o "all"
   const [filterStatus, setFilterStatus] = useState<string>("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(6)
@@ -100,58 +51,75 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
   const [secondHoverBackground, setSecondHoverBackground] = useState("")
   const [principalHoverText, setPrincipalHoverText] = useState("")
   const [propertyToDelete, setPropertyToDelete] = useState<Property | null>(null)
+
   useEffect(() => {
-      const rawUserData = localStorage.getItem("user_data")
-      const rawClientData = localStorage.getItem("tenant_data")
-      const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
-      if (tenant_data.styles_site){
-        setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
-        setPrincipalText(tenant_data.styles_site.principal_text)
-        setPrincipalHoverBackground(tenant_data.styles_site.principal_hover_background)
-        setSecondHoverBackground(tenant_data.styles_site.second_hover_background)
-        setPrincipalHoverText(tenant_data.styles_site.principal_hover_text)
-      }
+    const rawClientData = localStorage.getItem("tenant_data")
+    const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
+    if (tenant_data?.styles_site){
+      setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
+      setPrincipalText(tenant_data.styles_site.principal_text)
+      setPrincipalHoverBackground(tenant_data.styles_site.principal_hover_background)
+      setSecondHoverBackground(tenant_data.styles_site.second_hover_background)
+      setPrincipalHoverText(tenant_data.styles_site.principal_hover_text)
+    }
   }, [])
+
   const fetchedProperties = async () => {
-      const isValid = AuthService.isTokenValid()
-      if (!isValid) {
-        const isRefreshValid = await AuthService.isRefreshTokenValid()
-        if (!isRefreshValid)window.location.href = "/"
-      }
-      const propertiesResponse = await PropertiesService.getProperties()
-      console.log(propertiesResponse)
-      const fetchedProperties = propertiesResponse || []
-      return fetchedProperties.map((feature: any) => ({
-        ...feature,
-      }))
+    const isValid = AuthService.isTokenValid()
+    if (!isValid) {
+      const isRefreshValid = await AuthService.isRefreshTokenValid()
+      if (!isRefreshValid) window.location.href = "/"
+    }
+    const propertiesResponse = await PropertiesService.getProperties()
+    const fetched = propertiesResponse || []
+    return fetched.map((item: any) => ({ ...item }))
   }
+
   const { data: properties = [], isLoading } = useSWR('properties', fetchedProperties)
-  // const [properties, setProperties] = useState<Property[]>(mockProperties)
   const router = useRouter()
+
   const handleClick = () => {
-    // ... lógica previa si la necesitas
     router.push("/dashboard/properties/properties/create")
   }
-  
 
-  const filteredProperties = properties.filter((property) => {
-    const matchesSearch =
-      property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.description.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesType = filterType === "all" || property.property_type === filterType
-    const matchesStatus = filterStatus === "all" || property.property_state === filterStatus
-    return matchesSearch && matchesType && matchesStatus
-  })
+  // Helpers de tipos
+  const titleCase = (s: string) =>
+    s
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/(^|\s)\p{L}/gu, (m) => m.toUpperCase())
 
-  const totalPages = Math.ceil(filteredProperties.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedProperties = filteredProperties.slice(startIndex, startIndex + itemsPerPage)
-
-  const handleFilterChange = (filterFn: () => void) => {
-    filterFn()
-    setCurrentPage(1)
+  // Retorna la ETIQUETA según el enum, aceptando clave o valor
+  const getTypeLabel = (type: string): string => {
+    // 1) Si es CLAVE del enum
+    if (type in PropertyTypeEnum) {
+      return PropertyTypeEnum[type as keyof typeof PropertyTypeEnum]
+    }
+    // 2) Si ya viene como VALOR del enum
+    const byValue = Object.values(PropertyTypeEnum).find(
+      (v) => v.toLowerCase() === type?.toLowerCase?.()
+    )
+    if (byValue) return byValue
+    // 3) Fallback
+    return titleCase(type || "")
   }
 
+  // map para filtrar por tipo:
+  // - El select guarda la CLAVE (p.ej. "DEPARTAMENTO_AMOBLADO")
+  // - La propiedad suele guardar el VALOR (p.ej. "Departamento amoblado")
+  //   Entonces comparamos convirtiendo la clave a valor con el enum.
+  const matchesTypeFn = (propertyType: string, selectedKey: string) => {
+    if (selectedKey === "all") return true
+    const selectedLabel = PropertyTypeEnum[selectedKey as keyof typeof PropertyTypeEnum]
+    // property.property_type podría venir como clave o como valor, cubrimos ambos
+    return (
+      propertyType === selectedKey ||
+      propertyType === selectedLabel ||
+      getTypeLabel(propertyType) === selectedLabel
+    )
+  }
+
+  // Estado → Badge
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "Disponible":
@@ -169,27 +137,15 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
     }
   }
 
-  const getTypeLabel = (type: string) => {
-    const types = {
-      casa: "Casa",
-      apartamento: "Apartamento",
-      local: "Local",
-      oficina: "Oficina",
-      terreno: "Terreno",
-    }
-    return types[type as keyof typeof types] || type
-  }
-
   const handleDeleteProperty = (property: Property) => {
     setPropertyToDelete(property)
   }
   
   const deleteProperty = async (propertyId: number) => {
     const response = await PropertiesService.deleteProperty(propertyId)
-
-    if (response.success) {
+    if (response?.success) {
       mutate('properties', (current: Property[] = []) => {
-        const updated = current.filter(property => property.id !== Number(propertyId))
+        const updated = current.filter(p => Number(p.id) !== Number(propertyId))
         localStorage.setItem("properties", JSON.stringify(updated))
         return updated
       }, false)
@@ -198,71 +154,51 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
 
   const changePublishedProperty = async (propertyId: number) => {
     const response = await PropertiesService.changePublishedProperty(propertyId)
-
     if (response?.success && response.data) {
       const updatedProperty: Property = response.data
-
       mutate(
         "properties",
         (current: Property[] | undefined) => {
-          // Toma el listado actual de SWR o, si no existe, desde localStorage
           const list: Property[] =
-            current ??
-            (JSON.parse(localStorage.getItem("properties") || "[]") as Property[])
-
-          const idx = list.findIndex((p) => p.id === Number(updatedProperty.id))
-
+            current ?? (JSON.parse(localStorage.getItem("properties") || "[]") as Property[])
+          const idx = list.findIndex((p) => Number(p.id) === Number(updatedProperty.id))
           let updated: Property[]
           if (idx >= 0) {
-            // Reemplaza manteniendo el orden (merge por seguridad)
             updated = [...list]
             updated[idx] = { ...list[idx], ...updatedProperty }
           } else {
-            // Si no estaba, lo insertamos al inicio (o al final según tu UX)
             updated = [updatedProperty, ...list]
           }
-
           localStorage.setItem("properties", JSON.stringify(updated))
           return updated
         },
-        false // sin revalidar ahora
+        false
       )
-
-      // (Opcional) si tienes un cache por propiedad, sincronízalo también:
-      // mutate(["property", propertyId], updatedProperty, false)
     }
   }
 
   const confirmDeleteUser = () => {
     if (propertyToDelete) {
+      const idNum = Number(propertyToDelete.id)
       setPropertyToDelete(null)
-      deleteProperty(propertyToDelete.id)
+      deleteProperty(idNum)
     }
   }
 
   type Currency = "CLP" | "USD" | "UF"
 
-  /** Convierte a número detectando correctamente el separador decimal:
-   * - "2000000.00"  -> 2000000   (punto decimal)
-   * - "1.234,56"    -> 1234.56   (formato chileno)
-   * - "15,5" / "15.5" -> 15.5
-   */
+  /** Num formatting helpers */
   const toNumberSmart = (v: number | string, currency: Currency) => {
     if (typeof v === "number") return v
     const s = String(v || "").trim()
     if (!s) return 0
-
-    // Caso: solo punto y actúa como decimal (p. ej. "2000000.00", "15.5")
     const isDotDecimal = !s.includes(",") && /^\d+\.\d{1,6}$/.test(s)
     if (isDotDecimal) return Number(s)
-
-    // Regla chilena: "." miles, "," decimal
     const normalized = s.replace(/\./g, "").replace(",", ".")
     const n = Number(normalized)
     return Number.isFinite(n) ? n : 0
   }
 
-  /** Cuenta los decimales del valor de entrada para respetarlos en la salida (máx 2) */
   const countInputDecimals = (v: number | string) => {
     if (typeof v === "number") {
       const s = String(v)
@@ -270,11 +206,10 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
       return i === -1 ? 0 : Math.min(2, s.length - i - 1)
     }
     const s = String(v)
-    // "2000000.00" → 2 ; "15.5" → 1
     if (!s.includes(",") && /^\d+\.\d{1,6}$/.test(s)) return Math.min(s.split(".")[1].length, 2)
-    // "1.234,56" → 2 ; "15,5" → 1
     return Math.min((s.split(",")[1]?.length ?? 0), 2)
   }
+
   const formatPrice = (
     value: number | string,
     currency: Currency = "CLP",
@@ -294,10 +229,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
 
     let nRaw = toNumberSmart(value, currency)
 
-    // 🔎 Corrección automática común: CLP en centavos (x100)
-    // Si no especificaste inputMinorUnitFactor, intentamos detectar el caso típico:
-    // entero grande, divisible por 100, sin separadores en el string de origen,
-    // y en un rango razonable (>= 100.000.000).
+    // Detección heurística de CLP en centavos
     if (currency === "CLP") {
       const s = typeof value === "string" ? value.trim() : ""
       const looksPlainIntegerString = s && /^[0-9]+$/.test(s)
@@ -305,7 +237,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
         inputMinorUnitFactor == null &&
         Number.isInteger(nRaw) &&
         nRaw % 100 === 0 &&
-        nRaw >= 100_000_000 && // 100 millones
+        nRaw >= 100_000_000 &&
         (looksPlainIntegerString || typeof value === "number")
 
       const factor = inputMinorUnitFactor ?? (autoLooksLikeCents ? 100 : 1)
@@ -328,12 +260,10 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
         .map((p) => p.value)
         .join("")
         .trim()
-
       if (!showCode) return numberOnly
       return codePosition === "suffix" ? `${numberOnly} UF` : `UF ${numberOnly}`
     }
 
-    // CLP / USD
     return new Intl.NumberFormat("es-CL", {
       style: "currency",
       currency,
@@ -342,9 +272,30 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
     }).format(nRaw)
   }
 
+  // --- Filtros, paginación y resultados ---
+  const filteredProperties = properties.filter((property) => {
+    const matchesSearch =
+      property.address?.toLowerCase?.().includes(searchTerm.toLowerCase()) ||
+      property.description?.toLowerCase?.().includes(searchTerm.toLowerCase())
+
+    const matchesType = matchesTypeFn(String(property.property_type || ""), filterType)
+    const matchesStatus = filterStatus === "all" || property.property_state === filterStatus
+
+    return matchesSearch && matchesType && matchesStatus
+  })
+
+  const totalPages = Math.ceil(filteredProperties.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const paginatedProperties = filteredProperties.slice(startIndex, startIndex + itemsPerPage)
+
+  const handleFilterChange = (filterFn: () => void) => {
+    filterFn()
+    setCurrentPage(1)
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
+      {/* Loader */}
       {isLoading ? (
         <div className="fixed inset-0 z-50 grid place-items-center bg-background/80 backdrop-blur-sm">
           <div role="status" aria-live="polite" className="flex flex-col items-center gap-3">
@@ -365,10 +316,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                   </div>
                 </div>
 
-                <Button
-                  className="w-full sm:w-auto"
-                  onClick={handleClick}
-                >
+                <Button className="w-full sm:w-auto" onClick={handleClick}>
                   <Plus className="h-4 w-4 mr-2" />
                   Nueva Propiedad
                 </Button>
@@ -377,7 +325,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
           </div>
 
           <div className="px-4 sm:px-6 lg:px-8 py-8">
-            {/* Filters and View Toggle */}
+            {/* Filtros y vista */}
             <div className="flex flex-col gap-4 sm:gap-6 sm:flex-row sm:items-center sm:justify-between mb-6">
               {/* Filtros */}
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:space-x-4">
@@ -392,20 +340,19 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 w-full sm:w-auto">
+                  {/* Tipo (usa CLAVES del enum) */}
                   <select
                     value={filterType}
                     onChange={(e) => handleFilterChange(() => setFilterType(e.target.value))}
-                    className="p-2 border border-border rounded-md bg-background min-w-[160px]"
+                    className="p-2 border border-border rounded-md bg-background min-w-[200px]"
                   >
                     <option value="all">Todos los tipos</option>
-                    <option value="Casa">Casa</option>
-                    <option value="Departamento">Departamento</option>
-                    <option value="Parcela">Parcela</option>
-                    <option value="Comercial">Local</option>
-                    <option value="Oficina">Oficina</option>
-                    <option value="Terreno">Terreno</option>
+                    {Object.entries(PropertyTypeEnum).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
                   </select>
 
+                  {/* Estado */}
                   <select
                     value={filterStatus}
                     onChange={(e) => handleFilterChange(() => setFilterStatus(e.target.value))}
@@ -421,7 +368,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                 </div>
               </div>
 
-              {/* View Mode Toggle */}
+              {/* Toggle vista */}
               <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end">
                 <Button
                   variant={viewMode === "grid" ? "default" : "outline"}
@@ -442,13 +389,13 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
               </div>
             </div>
 
-            {/* Results Info */}
+            {/* Info resultados */}
             <div className="mb-4 text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
               Mostrando {startIndex + 1}-{Math.min(startIndex + itemsPerPage, filteredProperties.length)} de{" "}
               {filteredProperties.length} propiedades
             </div>
 
-            {/* Properties Display */}
+            {/* Grid / Lista */}
             {viewMode === "grid" ? (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {paginatedProperties.map((property) => (
@@ -461,7 +408,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           </div>
                           <div>
                             <CardTitle className="text-base">
-                              {getTypeLabel(property.property_type)}
+                              {getTypeLabel(String(property.property_type))}
                             </CardTitle>
                             <div className="flex items-center text-sm text-muted-foreground">
                               <MapPin className="h-3 w-3 mr-1" />
@@ -473,22 +420,16 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              (window.location.href = `/dashboard/properties/properties/edit/${property.id}`)
-                            }
+                            onClick={() => (window.location.href = `/dashboard/properties/properties/edit/${property.id}`)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
                           <Button 
                             variant="ghost" size="sm"
-                            onClick={() => changePublishedProperty(property.id)}
+                            onClick={() => changePublishedProperty(Number(property.id))}
                             title="Activar/Desactivar" aria-label="Activar/Desactivar"
                           >
-                            {property.published ? (
-                              <Eye className="h-4 w-4" />
-                            ) : (
-                              <EyeOff className="h-4 w-4" />
-                            )}
+                            {property.published ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                           </Button>
                           <Button 
                             variant="ghost" size="sm" onClick={() => handleDeleteProperty(property)}
@@ -499,14 +440,11 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <CardDescription 
-                      // className="mb-3"
-                      className="text-gray-600 mb-3 text-sm leading-relaxed min-h-[2.5rem] line-clamp-2 flex-grow"
-                      >
+                      <CardDescription className="text-gray-600 mb-3 text-sm leading-relaxed min-h-[2.5rem] line-clamp-2 flex-grow">
                         {property.description}
                       </CardDescription>
                       <div className="space-y-2">
-                        {property.price && (
+                        {!!property.price && (
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground">Precio:</span>
                             <span className="font-semibold">
@@ -520,13 +458,13 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           <span className="text-sm text-muted-foreground">Área:</span>
                           <span>{property.built_area} m²</span>
                         </div>
-                        {property.bedrooms && (
+                        {!!property.bedrooms && (
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground">Dormitorios:</span>
                             <span>{property.bedrooms}</span>
                           </div>
                         )}
-                        {property.bathrooms && (
+                        {!!property.bathrooms && (
                           <div className="flex justify-between items-center">
                             <span className="text-sm text-muted-foreground">Baños:</span>
                             <span>{property.bathrooms}</span>
@@ -534,7 +472,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                         )}
                         <div className="flex justify-between items-center">
                           <span className="text-sm text-muted-foreground">Estado:</span>
-                          {getStatusBadge(property.property_state)}
+                          {getStatusBadge(String(property.property_state))}
                         </div>
                       </div>
                     </CardContent>
@@ -554,9 +492,9 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           <div className="flex-1 min-w-0">
                             <div className="flex flex-wrap items-center gap-2 mb-2">
                               <h3 className="text-base sm:text-lg font-semibold">
-                                {getTypeLabel(property.property_type)}
+                                {getTypeLabel(String(property.property_type))}
                               </h3>
-                              {getStatusBadge(property.property_state)}
+                              {getStatusBadge(String(property.property_state))}
                             </div>
                             <div className="flex items-center text-muted-foreground mb-2">
                               <MapPin className="h-4 w-4 mr-1" />
@@ -566,26 +504,26 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                               {property.description}
                             </p>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 text-sm">
-                              {property.price && (
-                              <div>
-                                <span className="text-muted-foreground">Precio:</span>
-                                <div className="font-semibold">
-                                  {formatPrice(property.price ?? 0, (property.currency as Currency) || "CLP")}
-                                  {property.listingType === "rent" && "/mes"}
+                              {!!property.price && (
+                                <div>
+                                  <span className="text-muted-foreground">Precio:</span>
+                                  <div className="font-semibold">
+                                    {formatPrice(property.price ?? 0, (property.currency as Currency) || "CLP")}
+                                    {property.listingType === "rent" && "/mes"}
+                                  </div>
                                 </div>
-                              </div>
                               )}
                               <div>
                                 <span className="text-muted-foreground">Área:</span>
                                 <div>{property.area} m²</div>
                               </div>
-                              {property.bedrooms && (
+                              {!!property.bedrooms && (
                                 <div>
                                   <span className="text-muted-foreground">Dormitorios:</span>
                                   <div>{property.bedrooms}</div>
                                 </div>
                               )}
-                              {property.bathrooms && (
+                              {!!property.bathrooms && (
                                 <div>
                                   <span className="text-muted-foreground">Baños:</span>
                                   <div>{property.bathrooms}</div>
@@ -595,18 +533,16 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                           </div>
                         </div>
 
-                        {/* Acciones (caen abajo en mobile) */}
+                        {/* Acciones */}
                         <div className="flex space-x-1 sm:ml-4 order-first sm:order-last justify-end">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() =>
-                              (window.location.href = `/dashboard/properties/properties/edit/${property.id}`)
-                            }
+                            onClick={() => (window.location.href = `/dashboard/properties/properties/edit/${property.id}`)}
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteProperty(property.id)}>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteProperty(property)}>
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -617,7 +553,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
               </div>
             )}
 
-            {/* Pagination Controls */}
+            {/* Paginación */}
             {totalPages > 1 && (
               <div className="mt-8 flex justify-center">
                 <Pagination>
@@ -652,6 +588,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
               </div>
             )}
           </div>
+
           {/* Dialog de confirmación para eliminar */}
           <Dialog open={!!propertyToDelete} onOpenChange={() => setPropertyToDelete(null)}>
             <DialogContent>
@@ -672,13 +609,17 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setPropertyToDelete(null)}
-                className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
+                <Button
+                  variant="outline"
+                  onClick={() => setPropertyToDelete(null)}
+                  className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
                 >
                   Cancelar
                 </Button>
-                <Button variant="destructive" onClick={confirmDeleteUser}
-                className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
+                <Button
+                  variant="destructive"
+                  onClick={confirmDeleteUser}
+                  className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
                 >
                   Eliminar Propiedad
                 </Button>

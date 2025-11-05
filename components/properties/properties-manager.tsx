@@ -275,6 +275,7 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
   // --- Filtros, paginación y resultados ---
   const filteredProperties = properties.filter((property) => {
     const matchesSearch =
+      property.title?.toLowerCase?.().includes(searchTerm.toLowerCase()) ||
       property.address?.toLowerCase?.().includes(searchTerm.toLowerCase()) ||
       property.description?.toLowerCase?.().includes(searchTerm.toLowerCase())
 
@@ -440,6 +441,9 @@ export function PropertiesManager({ siteId }: PropertiesManagerProps) {
                       </div>
                     </CardHeader>
                     <CardContent>
+                      <CardTitle className="text-gray-600 text-sm leading-relaxed min-h-[2.5rem] line-clamp-2 flex-grow">
+                        {property.title}
+                      </CardTitle>
                       <CardDescription className="text-gray-600 mb-3 text-sm leading-relaxed min-h-[2.5rem] line-clamp-2 flex-grow">
                         {property.description}
                       </CardDescription>

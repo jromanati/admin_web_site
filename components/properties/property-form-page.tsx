@@ -79,7 +79,6 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
       const list: any[] = JSON.parse(raw);
       const prop = list.find(p => String(p.id) === String(propertyId));
       if (!prop) return;
-      console.log(prop.property_type)
       setInitialData({
         title: prop.title ?? "",
         code: prop.code ?? "",
@@ -108,6 +107,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
         address: prop.address ?? "",
         parking: numOrUndef(prop.parking),
         storage: !!prop.storage,
+        mainImage: prop.image_url,
         images: prop.images,
         video: prop.video_url ?? null,
       });
@@ -141,6 +141,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
         address: "",
         parking: 0,
         storage: false,
+        mainImage: null,
         images: [],
         video: null,
       });
@@ -153,12 +154,13 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
       const isRefreshValid = await AuthService.isRefreshTokenValid()
       if (!isRefreshValid)window.location.href = "/"
     }
-    console.log("Property data:", data)
     setIsSending(true)
     let res;
     if (mode === "edit" && propertyId) {
       const data_to_update = data
       data_to_update.deleted_images = JSON.stringify(data.deletedImagePublicIds)
+      data_to_update.mainImageDelete = data.mainImageDelete
+      data_to_update.videoDelete = data.videoDelete
       res = await PropertiesService.updateProperty(data_to_update, Number(propertyId))
     }
     else{

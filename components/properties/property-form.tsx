@@ -130,7 +130,11 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
   const [selectedRegion, setSelectedRegion] = useState(initialData?.region || "")
   const [availableCommunes, setAvailableCommunes] = useState<string[]>([])
   const [images, setImages] = useState<File[]>([])
+  const [mainImage, setMainImage] = useState<File>()
+  const [mainImageExist, setMainImageExist] = useState<string>("")
+  const [mainImageDelete, setmainImageDelete] = useState<boolean>(false)
   const [video, setVideo] = useState<string | null>(initialData?.video || null)
+  const [videoDelete, setvideoDelete] = useState<boolean>(false)
   const [secondBackgroundColor, setSecondBackgroundColor] = useState("")
   const [principalText, setPrincipalText] = useState("")
   const [principalHoverBackground, setPrincipalHoverBackground] = useState("")
@@ -140,6 +144,10 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
   useEffect(() => {
     if (initialData && initialData.video){
       setVideo(initialData.video || null)
+    }
+    console.log(initialData, 'initialData')
+    if (initialData?.mainImage) {
+      setMainImageExist(initialData.mainImage)
     }
     const rawClientData = localStorage.getItem("tenant_data")
     const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
@@ -188,6 +196,7 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
       address: "",
       parking: undefined,
       storage: false,
+      mainImage: null,
       images: [],
       video: null,
       ...initialData,
@@ -237,6 +246,22 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     setValue("commune", "") // Reset commune when region changes
   }
 
+  const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setMainImage(file)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+  const removeMainImage = () => {
+    setMainImage(undefined)
+    setMainImageExist("")
+    setmainImageDelete(true)
+  }
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
     if (files) {
@@ -281,9 +306,12 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
       ...data,
       // fuerza precio como number
       price: priceNumber as any,
+      mainImage,
+      mainImageDelete,
       images,
       deletedImagePublicIds,
-      video
+      video,
+      videoDelete
     } as Property)
   }
 
@@ -626,7 +654,65 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
 
         {/* Imágenes */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Imágenes</label>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Imágen de portada
+          </label>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm mb-2">
+                Esta será la imagen principal que se mostrará en la proiedad
+              </p>
+              <div className="mt-2">
+                <input
+                  id="main-image"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleMainImageUpload}
+                  className="hidden"
+                />
+                {!mainImage && !mainImageExist ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => document.getElementById("main-image")?.click()}
+                    className={`w-full h-40 border-dashed ${secondHoverBackground}`}
+                  >
+                    <div className="text-center">
+                      <Upload className="h-10 w-10 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm ">Haz clic para subir la imagen principal</p>
+                    </div>
+                  </Button>
+                ) : (
+                  <div className="relative w-full h-40">
+                    <img
+                      // src={URL.createObjectURL(mainImage)}
+                      src={mainImageExist ? mainImageExist : URL.createObjectURL(mainImage)}
+                      alt="Imagen principal"
+                      className="w-full h-full object-cover rounded-lg border"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      className="absolute -top-2 -right-2 h-6 w-6 p-0"
+                      onClick={removeMainImage}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+
+          </div>
+        </div>
+
+        {/* Imágenes */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Imágenes adicionales
+          </label>
           <div className="space-y-4">
             {/* Upload button */}
             <div className="flex items-center justify-center w-full">
@@ -676,9 +762,10 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
           </p>
           <VideoUpload
             value={video}
-            onChange={(newVideo) => {
+            onChange={(newVideo, videoDelete) => {
               setVideo(newVideo)
               setValue("video", newVideo)
+              setvideoDelete(videoDelete)
             }}
             maxSize={150}
           />

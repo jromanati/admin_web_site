@@ -6,7 +6,7 @@ import { Upload, Trash2 } from "lucide-react"
 
 interface VideoUploadProps {
   value?: string
-  onChange: (video: string | null) => void
+  onChange: (video: string | null, videoDelete: boolean | false) => void
   maxSize?: number // in MB
 }
 
@@ -63,7 +63,7 @@ const VideoUpload = ({ value, onChange, maxSize = 150 }: VideoUploadProps) => {
     if (videoValue) {
       URL.revokeObjectURL(videoValue)
     }
-    onChange(null)
+    onChange(null, true)
     setError(null)
   }
 

@@ -64,6 +64,9 @@ export class PropertiesService {
       if (property.parking !== undefined) formData.append("parking", String(property.parking));
       formData.append("storage", String(property.storage));
 
+      if (property.mainImage) {
+        formData.append("main_image", property.mainImage)
+      }
       // 📸 Agregar imágenes (si las hay)
       if (property.images && Array.isArray(property.images)) {
         property.images.forEach((img: File | any) => {
@@ -139,10 +142,18 @@ export class PropertiesService {
       if (property.deleted_images && property.deleted_images.length > 0) {
         formData.append("deleted_images", property.deleted_images)
       }
+      if (property.mainImage) {
+        formData.append("main_image", property.mainImage)
+      }
+      if (property.mainImageDelete) {
+        formData.append("main_image_delete", String(property.mainImageDelete))
+      }
       if (property.video) {
         formData.append("video", property.video)
       }
-      console.log("deletedImagePublicIds", property.video)
+      if (property.videoDelete) {
+        formData.append("video_delete", String(property.videoDelete))
+      }
       const response = await apiClient.put<Property>(`properties/${propertyId}/update/`, formData)
       if (response.success) {
         return response

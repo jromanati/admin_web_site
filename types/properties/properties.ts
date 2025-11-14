@@ -33,9 +33,12 @@ export interface Property {
   address: string
   parking?: number
   storage: boolean
+  mainImage: null
+  mainImageDelete: boolean
   images?: PropertyImage[]
   deleted_images?: []
   video: null,
+  videoDelete: boolean
 }
 
 export enum PropertyTypeEnum {

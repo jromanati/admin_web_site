@@ -201,7 +201,7 @@ export function BrandsList({ siteId }: BrandsListProps) {
                   <SelectItem value="inactive">Inactivas</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={countryFilter} onValueChange={setCountryFilter}>
+              {/* <Select value={countryFilter} onValueChange={setCountryFilter}>
                 <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="País" />
                 </SelectTrigger>
@@ -213,7 +213,7 @@ export function BrandsList({ siteId }: BrandsListProps) {
                     </SelectItem>
                   ))}
                 </SelectContent>
-              </Select>
+              </Select> */}
             </div>
           </div>
 

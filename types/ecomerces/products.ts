@@ -28,6 +28,17 @@ export interface ProductSpecificationsGroup {
   value: string
 }
 
+export interface ProductCompatibilitiesGroup {
+  id: string
+  value: string
+}
+
+export interface ProductBenefitsGroup {
+  id: string
+  value: string,
+  benefit_type: string
+}
+
 export interface Product {
   id: number
   name: string
@@ -49,6 +60,8 @@ export interface Product {
   features: ProductFeatureGroup[]
   deleted_images?: []
   specifications: ProductSpecificationsGroup[]
+  compatibilities: ProductCompatibilitiesGroup[]
+  benefits: ProductBenefitsGroup[]
 }
 
 export interface ProductResponse extends Product {

@@ -11,12 +11,17 @@ import { ArrowLeft, Upload, X, Plus, Trash2 } from "lucide-react"
 import { CategorySelector } from "@/components/ecommerce/category-selector"
 import { AttributesSelector } from "@/components/ecommerce/attributes-selector"
 import { AdminSidebar } from "@/components/admin-sidebar"
-import type { Product, ProductSpecificationsGroup } from "@/types/ecomerces/products"
+import type { 
+  Product, ProductSpecificationsGroup,
+  ProductCompatibilitiesGroup,
+  ProductBenefitsGroup
+} from "@/types/ecomerces/products"
 import { ProductsService } from "@/services/ecomerce/products/products.service"
 import { AuthService } from "@/services/auth.service"
 import useSWR, { mutate } from "swr"
 import { BrandSelector } from "@/components/ecommerce/brand-selector"
 import { useRouter } from "next/navigation"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 interface CreateProductPageProps {
   params: {
@@ -40,6 +45,7 @@ export default function CreateProductPage() {
   const [formData, setFormData] = useState({
     name: "",
     description: "",
+    original_price: "",
     price: "",
     stock: "",
     category: "",
@@ -58,8 +64,19 @@ export default function CreateProductPage() {
   const [secondHoverBackground, setSecondHoverBackground] = useState("")
   const [scondHoverText, setSecondlHoverText] = useState("")
   const [placeholderStyle, setPlaceholderStyle] = useState("")
+  const [principalHoverText, setPrincipalHoverText] = useState("")
   const [thirdBackgroundColor, setThirdBackgroundColor] = useState("")
   const [isLoading, setisLoading] = useState(true)
+
+  const [hasCompatibility, setHasCompatibility] = useState(false)
+  const [compatibilities, setCompatibilities] = useState<ProductCompatibilitiesGroup[]>([])
+
+  const [hasBenefit, setHasBenefit] = useState(false)
+  const [benefits, setBenefits] = useState<ProductBenefitsGroup[]>([])
+
+  const [hasAtributes, setHasAtributes] = useState(false)
+  
+  const [isNew, setIsNew] = useState(false)
 
   useEffect(() => {
       const rawUserData = localStorage.getItem("user_data")
@@ -73,6 +90,13 @@ export default function CreateProductPage() {
         setSecondHoverBackground(tenant_data.styles_site.second_hover_background)
         setSecondlHoverText(tenant_data.styles_site.second_hover_text)
         setPlaceholderStyle(tenant_data.styles_site.placeholder)
+        setPrincipalHoverText(tenant_data.styles_site.principal_hover_text)
+      }
+      const extra_modules = tenant_data ? tenant_data.extras_modules : []
+      if (extra_modules && extra_modules.length > 0){
+        setHasCompatibility(extra_modules.includes("compatibility"))
+        setHasBenefit(extra_modules.includes("benefits"))
+        setHasAtributes(extra_modules.includes("attributes"))
       }
       setisLoading(false);
   }, [])
@@ -124,7 +148,7 @@ export default function CreateProductPage() {
       name: formData.name,
       description: formData.description,
       price: parseFloat(formData.price),
-      original_price: 0,
+      original_price: parseFloat(formData.original_price || formData.price),
       rating: 5,
       stock: parseInt(formData.stock),
       sku: formData.sku,
@@ -134,7 +158,9 @@ export default function CreateProductPage() {
       images: images,
       features: featuresDetailIds,
       main_image: mainImage || null,
-      specifications: specifications
+      specifications: specifications,
+      compatibilities: compatibilities,
+      benefits: benefits,
     }
     if (!product.category){
       setErrors("* Debe asignar una categoría")
@@ -191,6 +217,39 @@ export default function CreateProductPage() {
   const handleClick = (route) => {
     setisLoading(true);
     router.push(route)
+  }
+
+  const addCompatibility = () => {
+    const newCompatibility: ProductCompatibilitiesGroup = {
+      id: Date.now().toString(),
+      value: "",
+    }
+    setCompatibilities([...compatibilities, newCompatibility])
+  }
+
+  const updateCompatibility = (id: string, value: string) => {
+    setCompatibilities(compatibilities.map((spec) => (spec.id === id ? { ...spec, value } : spec)))
+  }
+
+  const removeCompatibility = (id: string) => {
+    setCompatibilities(compatibilities.filter((spec) => spec.id !== id))
+  }
+
+  const addBenefit = () => {
+    const newBenefit: ProductBenefitsGroup = {
+      id: Date.now().toString(),
+      value: "",
+      benefit_type: "",
+    }
+    setBenefits([...benefits, newBenefit])
+  }
+
+  const updateBenefit = (id: string, field: "value" | "benefit_type", value: string) => {
+    setBenefits(benefits.map((bene) => (bene.id === id ? { ...bene, [field]: value } : bene)))
+  }
+
+  const removeBenefit = (id: string) => {
+    setBenefits(benefits.filter((spec) => spec.id !== id))
   }
 
 
@@ -264,7 +323,19 @@ export default function CreateProductPage() {
                           className={`${placeholderStyle}`}
                         />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor="original_price">Precio Original</Label>
+                          <Input
+                            id="original_price"
+                            type="number"
+                            step="0.01"
+                            value={formData.original_price}
+                            onChange={(e) => setFormData({ ...formData, original_price: e.target.value })}
+                            placeholder=""
+                            className={`mt-1 ${placeholderStyle}`}
+                          />
+                        </div>
                         <div>
                           <Label htmlFor="price">Precio *</Label>
                           <Input
@@ -293,6 +364,80 @@ export default function CreateProductPage() {
                       </div>
                     </CardContent>
                   </Card>
+
+                  {/* Benefits */}
+                  {hasBenefit && (
+                    <Card className={`${secondBackgroundColor} ${principalText} `}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle>Beneficios</CardTitle>
+                            <p className="text-sm mt-1">
+                              Agrega beneficio del producto
+                            </p>
+                          </div>
+                          <Button type="button" onClick={addBenefit} size="sm">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Agregar Beneficio
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {benefits.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p>No hay beneficios agregados</p>
+                            <p className="text-sm">
+                              Haz clic en "Agregar Beneficio" para comenzar
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {benefits.map((bene) => (
+                              <div key={bene.id} className="flex gap-4 items-start p-4 border border-border rounded-lg">
+                                <div className="flex-1">
+                                  <Label htmlFor={`spec-value-${bene.id}`}>
+                                    Beneficio
+                                  </Label>
+                                  <Input
+                                    id={`bene-value-${bene.id}`}
+                                    value={bene.value}
+                                    onChange={(e) => updateBenefit(bene.id, "value", e.target.value)}
+                                    className={`mt-1 ${placeholderStyle}`}
+                                  />
+                                </div>
+                                <div className="flex-1">
+                                  <Label htmlFor={`spec-type-${bene.id}`}>
+                                    Tipo de Beneficio
+                                  </Label>
+                                  <Select  value={bene.benefit_type} onValueChange={(value) => updateBenefit(bene.id, "benefit_type", value)}>
+                                    <SelectTrigger className={`mt-1 w-full sm:w-48 ${placeholderStyle}`}>
+                                      <SelectValue placeholder="Tipo de beneficio" 
+                                      className={`${placeholderStyle}`}
+                                      />
+                                    </SelectTrigger>
+                                    <SelectContent >
+                                      <SelectItem value="delivery">Envío</SelectItem>
+                                      <SelectItem value="warranty">Garantía</SelectItem>
+                                      <SelectItem value="return">Devolución</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeBenefit(bene.id)}
+                                  className={`mt-6 text-destructive ${secondHoverBackground} ${principalHoverText}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
 
                   {/* Specifications */}
                   <Card className={`${secondBackgroundColor} ${principalText} `}>
@@ -356,6 +501,65 @@ export default function CreateProductPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Compatibilities */}
+                  {hasCompatibility && (
+                    <Card className={`${secondBackgroundColor} ${principalText} `}>
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle>Compatibilidad</CardTitle>
+                            <p className="text-sm mt-1">
+                              Agrega compatibilidad del producto
+                            </p>
+                          </div>
+                          <Button type="button" onClick={addCompatibility} size="sm">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Agregar Compatibilidad
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        {compatibilities.length === 0 ? (
+                          <div className="text-center py-8">
+                            <p>No hay compatibilidades agregadas</p>
+                            <p className="text-sm">
+                              Haz clic en "Agregar Compatibilidad" para comenzar
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {compatibilities.map((spec) => (
+                              <div key={spec.id} className="flex gap-4 items-start p-4 border border-border rounded-lg">
+                                <div className="flex-1">
+                                  <Label htmlFor={`spec-value-${spec.id}`}>
+                                    Compatibilidad
+                                  </Label>
+                                  <Input
+                                    id={`spec-value-${spec.id}`}
+                                    value={spec.value}
+                                    onChange={(e) => updateCompatibility(
+                                      spec.id, e.target.value)}
+                                    className={`mt-1 ${placeholderStyle}`}
+                                  />
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => removeCompatibility(spec.id)}
+                                  // className="mt-6 text-destructive hover:text-destructive"
+                                  className={`mt-6 text-destructive ${secondHoverBackground} ${principalHoverText}`}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Brand Selection */}
                   <Card className={`${secondBackgroundColor} ${principalText} `}>
                     <CardHeader>
@@ -366,6 +570,7 @@ export default function CreateProductPage() {
                     </CardContent>
                   </Card>
 
+                  {/* Category Selection */}
                   <Card className={`${secondBackgroundColor} ${principalText} `}>
                     <CardHeader>
                       <CardTitle>Categoría del Producto</CardTitle>
@@ -375,17 +580,20 @@ export default function CreateProductPage() {
                     </CardContent>
                   </Card>
 
-                  <Card className={`${secondBackgroundColor} ${principalText} `}>
-                    <CardHeader>
-                      <CardTitle>Atributos del Producto</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <AttributesSelector
-                        selectedAttributes={selectedAttributes}
-                        onAttributesChange={handleAttributesChange}
-                      />
-                    </CardContent>
-                  </Card>
+                  {/* Atribute Selection */}
+                  {hasAtributes && (
+                    <Card className={`${secondBackgroundColor} ${principalText} `}>
+                      <CardHeader>
+                        <CardTitle>Atributos del Producto</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <AttributesSelector
+                          selectedAttributes={selectedAttributes}
+                          onAttributesChange={handleAttributesChange}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Card className={`${secondBackgroundColor} ${principalText} `}>
                     <CardHeader>

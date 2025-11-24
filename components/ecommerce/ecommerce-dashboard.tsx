@@ -107,7 +107,6 @@ export function EcommerceDashboard({ siteId }: EcommerceDashboardProps) {
       isTokenValid = true
     }
     const rawClientData = localStorage.getItem("tenant_data")
-    console.log(rawClientData, 'rawClientData')
     const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
     if (tenant_data.styles_site){
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -146,6 +145,7 @@ export function EcommerceDashboard({ siteId }: EcommerceDashboardProps) {
     const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
     setSiteData({
       name: tenant_data.name,
+      main_image: tenant_data.main_image,
       description: tenant_data.description
     })
   }, [])
@@ -185,9 +185,9 @@ export function EcommerceDashboard({ siteId }: EcommerceDashboardProps) {
                     {/* Logo */}
                     <div className="flex-shrink-0">
                       <img
-                        src={siteData.logo || "/placeholder.svg"}
+                        src={siteData.main_image || "/placeholder.svg"}
                         alt={`Logo de ${siteData.name}`}
-                        className="h-16 w-16 rounded-lg object-cover border-2 border-white shadow-sm"
+                        className="h-32 w-32 rounded-lg object-cover border-2 border-white shadow-sm"
                       />
                     </div>
 
@@ -246,7 +246,7 @@ export function EcommerceDashboard({ siteId }: EcommerceDashboardProps) {
                 </CardContent>
               </Card>
 
-              <Card className={`${secondBackgroundColor} ${principalText}`}>
+              {/* <Card className={`${secondBackgroundColor} ${principalText}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium">Pedidos</CardTitle>
                   <ShoppingCart className="h-4 w-4 " />
@@ -270,7 +270,7 @@ export function EcommerceDashboard({ siteId }: EcommerceDashboardProps) {
                   <div className="text-2xl font-bold">${mockStats.totalRevenue.toLocaleString()}</div>
                   <p className="text-xs ">+{mockStats.monthlyGrowth}% este mes</p>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
             {/* Control de Inventario */}
             {stockProducts.length ? (

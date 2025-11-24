@@ -12,7 +12,6 @@ export class EcomerceService {
 
   static async getCategories(): Promise<ApiResponse<CategoryResponse>> {
     const categoriesStored = localStorage.getItem("categories")
-    console.log(categoriesStored, 'categoriesStored')
     if (categoriesStored) {
       try {
         const parsed = JSON.parse(categoriesStored)

@@ -82,7 +82,6 @@ export class AuthService {
 
     const now = Math.floor(Date.now() / 1000)
     const expiresAt = parseInt(expiry, 10)
-    console.log("Checking refresh token validity:", now < expiresAt)
     if (now > expiresAt) {
       const refreshResponse = await this.refresh()
       if (refreshResponse.success && refreshResponse.data) {

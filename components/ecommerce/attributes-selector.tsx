@@ -8,6 +8,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { Check, Plus } from "lucide-react"
 import type {Feature} from "@/types/ecomerces/features"
+import { FeaturesService } from "@/services/ecomerce/features/features.service"
+import { AuthService } from "@/services/auth.service"
+import useSWR, { mutate } from "swr"
 
 const mockAttributes2 = [
   {
@@ -79,18 +82,20 @@ export function AttributesSelector({ selectedAttributes, onAttributesChange }: A
       }
   }, [])
 
-  const [mockAttributes, setCachedCategories] = useState<Feature[]>([])
-  useEffect(() => {
-    const stored = localStorage.getItem("features")
-    if (stored) {
-      try {
-        // const parsed = buildCategoryTree(JSON.parse(stored))
-        setCachedCategories(JSON.parse(stored))
-      } catch (e) {
-        console.error("Error parsing categories from localStorage", e)
+  // const [mockAttributes, setCachedCategories] = useState<Feature[]>([])
+  const fetchedFeatures = async () => {
+      const isValid = AuthService.isTokenValid()
+      if (!isValid) {
+        const isRefreshValid = await AuthService.isRefreshTokenValid()
+        if (!isRefreshValid)window.location.href = "/"
       }
-    }
-  }, [])
+      const featuresResponse = await FeaturesService.getFeatures()
+      const fetchedFeatures = featuresResponse || []
+      return fetchedFeatures.map((feature: any) => ({
+        ...feature,
+      }))
+  }
+  const { data: mockAttributes = [] } = useSWR('features', fetchedFeatures)
 
   const handleAttributeClick = (attributeId: string) => {
     const currentValues = selectedAttributes[attributeId] || []
@@ -245,9 +250,6 @@ export function AttributesSelector({ selectedAttributes, onAttributesChange }: A
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {currentAttribute.feature_detail.map((value) => {
-                  if (typeof value.id === "number") {
-                    console.log("Comparing with number array")
-                  }
                   const isSelected = tempSelectedValues.includes(
                     value.id
                   )

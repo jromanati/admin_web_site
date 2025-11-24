@@ -43,13 +43,28 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
   const [secondBackgroundColor, setSecondBackgroundColor] = useState("")
   const [principalHoverBackground, setPrincipalHoverBackground] = useState("")
   const [isLoading, setisLoading] = useState(true)
+  // extras modules
+  const [hasReviews, setHasReviews] = useState(false)
+  const [hasStreaming, setHasStreaming] = useState(false)
+  const [hasAtributes, setHasAtributes] = useState(false)
+
+
   useEffect(() => {
     const rawUserData = localStorage.getItem("user_data")
     const user_data = rawUserData ? JSON.parse(rawUserData) : null
     setUserData(user_data)
     const rawClientData = localStorage.getItem("tenant_data")
+    
     const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
     setTenantData(tenant_data)
+    const extra_modules = tenant_data ? tenant_data.extras_modules : []
+    console.log(extra_modules, 'extra_modules')
+    if (extra_modules && extra_modules.length > 0){
+      setHasReviews(extra_modules.includes("reviews"))
+      setHasStreaming(extra_modules.includes("streaming"))
+      setHasAtributes(extra_modules.includes("attributes"))
+    }
+    
     if (tenant_data.styles_site){
       setBackgroundColor(tenant_data.styles_site.background_color)
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -85,6 +100,34 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
       //   href: `/dashboard/${siteType}/${siteId}/reports`,
       // },
     ]
+    let extraModuleItems = []
+    if (hasAtributes) {
+      extraModuleItems.push(
+        {
+          icon: Sliders,
+          label: "Gestionar Atributos",
+          href: `/dashboard/ecommerce/features`,
+        },
+      )
+    }
+    if (hasReviews) {
+      extraModuleItems.push(
+        {
+          icon: Star,
+          label: "Gestionar Reseñas",
+          href: `/dashboard/ecommerce/reviews`,
+        },
+      )
+    }
+    if (hasStreaming) {
+      extraModuleItems.push(
+        {
+          icon: Video,
+          label: "Gestionar Streaming",
+          href: `/dashboard/ecommerce/streaming`,
+        },
+      )
+    }
 
     switch (siteType) {
       case "ecommerce":
@@ -100,11 +143,6 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
             href: `/dashboard/ecommerce/categories`,
           },
           {
-            icon: Sliders,
-            label: "Gestionar Atributos",
-            href: `/dashboard/ecommerce/features`,
-          },
-          {
             icon: Palette,
             label: "Gestionar Marcas",
             href: `/dashboard/ecommerce/brands`,
@@ -114,16 +152,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
             label: "Gestionar Productos",
             href: `/dashboard/ecommerce/products`,
           },
-          {
-            icon: Star,
-            label: "Gestionar Reseñas",
-            href: `/dashboard/ecommerce/reviews`,
-          },
-          {
-            icon: Video,
-            label: "Gestionar Streaming",
-            href: `/dashboard/ecommerce/streaming`,
-          },
+          ...extraModuleItems,
           // {
           //   icon: ShoppingCart,
           //   label: "Ver Pedidos",

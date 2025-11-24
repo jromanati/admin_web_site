@@ -62,7 +62,6 @@ export function PropertiesDashboard({ siteId }: PropertiesDashboardProps) {
     const rawClientData = localStorage.getItem("tenant_data")
     const tenant_data = rawClientData ? JSON.parse(rawClientData) : null    
     if (tenant_data.styles_site){
-      console.log(tenant_data.styles_site, 'tenant_data')
       setSecondBackgroundColor("bg-red-900")
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
       setPrincipalText(tenant_data.styles_site.principal_text)

@@ -8,15 +8,15 @@ export class ProductsService {
   static async getProducts(): Promise<ApiResponse<ProductResponse>> {
     const productsStored = localStorage.getItem("products")
     
-    if (productsStored) {
-      console.log(productsStored, 'productsStored!!!')
-      try {
-        const parsed = JSON.parse(productsStored)
-        return parsed
-      } catch (e) {
-        console.error("Error parsing categories from localStorage", e)
-      }
-    }
+    // if (productsStored) {
+    //   console.log(productsStored, 'productsStored!!!')
+    //   try {
+    //     const parsed = JSON.parse(productsStored)
+    //     return parsed
+    //   } catch (e) {
+    //     console.error("Error parsing categories from localStorage", e)
+    //   }
+    // }
     const response = await apiClient.get<ProductResponse>("products")
     const products = response.data
     localStorage.setItem("products", JSON.stringify(products))
@@ -65,6 +65,24 @@ export class ProductsService {
         formData.append("specifications", JSON.stringify(specs))
       }
 
+      // Compatibilidades
+      if (Array.isArray(product.compatibilities) && product.compatibilities.length) {
+        const specs = product.compatibilities.map(({ id, value }) => ({
+          id: String(id),
+          value: String(value ?? ""),
+        }))
+        formData.append("compatibilities", JSON.stringify(specs))
+      }
+      // Beneficios
+      if (Array.isArray(product.benefits) && product.benefits.length) {
+        const benefits = product.benefits.map(({ id, value, benefit_type }) => ({
+          id: String(id),
+          value: String(value ?? ""),
+          benefit_type: String(benefit_type ?? ""),
+        }))
+        formData.append("benefits", JSON.stringify(benefits))
+      }
+
       const response = await apiClient.post<Product>("products/create/", formData)
 
       if (response.success) {
@@ -99,9 +117,6 @@ export class ProductsService {
       if (product.deleted_images && product.deleted_images.length > 0) {
         formData.append("deleted_images", product.deleted_images)
       }
-      if (product.deleted_specification && product.deleted_specification.length > 0) {
-        formData.append("deleted_specification", product.deleted_specification)
-      }
       // Imágenes (solo si son nuevas del tipo File)
       if (product.images && Array.isArray(product.images)) {
         product.images.forEach((img: File | any) => {
@@ -117,6 +132,7 @@ export class ProductsService {
         formData.append("features", JSON.stringify(featureIds))
       }
 
+      // Especificaciones
       if (Array.isArray(product.specifications) && product.specifications.length) {
         const specs = product.specifications.map(({ id, name, value }) => ({
           id: String(id),
@@ -124,6 +140,32 @@ export class ProductsService {
           value: String(value ?? ""),
         }))
         formData.append("specifications", JSON.stringify(specs))
+      }
+      if (product.deleted_specification && product.deleted_specification.length > 0) {
+        formData.append("deleted_specification", product.deleted_specification)
+      }
+      // Compatibilidades
+      if (Array.isArray(product.compatibilities) && product.compatibilities.length) {
+        const specs = product.compatibilities.map(({ id, value }) => ({
+          id: String(id),
+          value: String(value ?? ""),
+        }))
+        formData.append("compatibilities", JSON.stringify(specs))
+      }
+      if (product.delete_compatibilities && product.delete_compatibilities.length > 0) {
+        formData.append("delete_compatibilities", product.delete_compatibilities)
+      }
+      // Beneficios
+      if (Array.isArray(product.benefits) && product.benefits.length) {
+        const benefits = product.benefits.map(({ id, value, benefit_type }) => ({
+          id: String(id),
+          value: String(value ?? ""),
+          benefit_type: String(benefit_type ?? ""),
+        }))
+        formData.append("benefits", JSON.stringify(benefits))
+      }
+      if (product.delete_benefits && product.delete_benefits.length > 0) {
+        formData.append("delete_benefits", product.delete_benefits)
       }
       const response = await apiClient.put<Product>(`products/${productId}/update/`, formData)
 

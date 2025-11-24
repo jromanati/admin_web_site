@@ -145,7 +145,6 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     if (initialData && initialData.video){
       setVideo(initialData.video || null)
     }
-    console.log(initialData, 'initialData')
     if (initialData?.mainImage) {
       setMainImageExist(initialData.mainImage)
     }

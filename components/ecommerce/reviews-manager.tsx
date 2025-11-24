@@ -159,7 +159,6 @@ export function ReviewsManager({ siteId }: ReviewsManagerProps) {
       const reviewsResponse = await ReviewsService.getReviews()
       const fetchedReviews = reviewsResponse || []
       // setisLoading(false);
-      console.log(reviewsResponse, 'reviewsResponse')
       return fetchedReviews.map((review: any) => ({
         ...review,
       }))
@@ -255,7 +254,6 @@ export function ReviewsManager({ siteId }: ReviewsManagerProps) {
 
   const handleRejectReview = async (id:number) => {
     const response = await ReviewsService.rejectProductReview(id)
-    console.log(response, 'response')
     if (response.data) {
       mutate('reviews', (current: Review[] = []) => {
         const updated = current.map(cat =>

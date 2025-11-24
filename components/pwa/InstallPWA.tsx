@@ -63,7 +63,6 @@ export default function InstallPWA() {
     const choice = await deferred.userChoice;
     setDeferred(null);
     setCanInstallPrompt(false);
-    console.log("User choice:", choice);
   };
 
   const dismissIOS = () => {

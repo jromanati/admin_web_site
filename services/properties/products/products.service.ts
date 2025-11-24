@@ -9,7 +9,6 @@ export class ProductsService {
     const productsStored = localStorage.getItem("products")
     
     if (productsStored) {
-      console.log(productsStored, 'productsStored!!!')
       try {
         const parsed = JSON.parse(productsStored)
         return parsed

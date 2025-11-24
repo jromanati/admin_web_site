@@ -179,7 +179,6 @@ export function StreamingManager({ siteId }: StreamingManagerProps) {
         stream_key: formData.stream_key,
         is_active: true,
       }
-      console.log(formStreamConfig, 'formStreamConfig')
 
       const response = await StreamConfigService.postStreamConfig(formStreamConfig)
 

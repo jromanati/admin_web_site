@@ -169,7 +169,6 @@ export function UsersManager({ siteId, siteType }: UsersManagerProps) {
       is_superuser: newUser.is_superuser,
       password: newUser.password
     }
-    console.log(userData, 'userData')
     const response = await UsersService.updateUser(userData, id)
 
     if (response.success) {

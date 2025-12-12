@@ -358,6 +358,11 @@ export function ProductsManager({ siteId }: ProductsManagerProps) {
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
   }
+  const router = useRouter()
+  const handleClick = (route: string) => {
+    setisLoading(true)
+    router.push(route)
+  }
 
   return (
     <div className="min-h-screen bg-background">

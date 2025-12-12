@@ -32,6 +32,8 @@ import { EcomerceService } from "@/services/ecomerce/categories/ecomerce.service
 import { AuthService } from "@/services/auth.service"
 import useSWR, { mutate } from "swr"
 import type {Category} from "@/types/ecomerces/categories"
+import { useToast } from "@/hooks/use-toast"
+import * as XLSX from "xlsx"
 
 // interface Category {
 //   id: string
@@ -84,6 +86,7 @@ export function CategoriesManager() {
   const [principalHoverBackground, setPrincipalHoverBackground] = useState("")
   const [secondHoverBackground, setSecondHoverBackground] = useState("")
   const [principalHoverText, setPrincipalHoverText] = useState("")
+  const { toast } = useToast()
 
   useEffect(() => {
       const rawUserData = localStorage.getItem("user_data")
@@ -117,6 +120,8 @@ export function CategoriesManager() {
         }
       }
     }
+
+    
 
     categories.forEach((category) => {
       const nameMatch = category.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -316,6 +321,141 @@ export function CategoriesManager() {
   const getSubcategoryCount = (categoryId: string) => {
     return categories.filter((cat) => cat.parent === categoryId).length
   }
+
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importType, setImportType] = useState<"products" | "images">("products")
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<{
+    message: string
+    errors: string[]
+    products_created?: number
+    products_updated?: number
+  } | null>(null)
+  
+
+  const handleImportProducts = async () => {
+    if (!importFile) {
+      setImportError({
+        message: "Debes seleccionar un archivo para importar.",
+        errors: [],
+      })
+      return
+    }
+    try {
+      const res = await EcomerceService.uploadCategories(importFile)
+
+      if (res.success) {
+        await mutate("categories")
+        toast({
+          title: "Importación exitosa",
+          description: "La importación de categorías se realizó correctamente.",
+        })
+        setIsImportDialogOpen(false)
+        setImportFile(null)
+        setImportError(null)
+      } else {
+        setImportError({
+          message: res.error || "Ocurrieron errores al importar los productos.",
+          errors: Array.isArray(res.data.errors) ? res.data.errors : [],
+          products_created: res.data?.products_created ?? 0,
+          products_updated: res.data?.products_updated ?? 0,
+        })
+      }
+    } catch (error) {
+      console.error("Error al importar categorías", error)
+      setImportError({
+        message: "Error inesperado al importar categorías.",
+        errors: [],
+        products_created: 0,
+        products_updated: 0,
+      })
+    } finally {
+      setIsImporting(false)
+    }      
+  }
+  
+  const handleDownloadTemplate = () => {
+    // Definimos las columnas (headers)
+    const headers = [
+      "name",
+      "description",
+      "parent",
+      "is_active",
+    ]
+
+    // Opcional: fila de ejemplo vacía o con valores de muestra
+    const exampleRow = [
+      "Categoría ejemplo",
+      "Descripción de la categoría",
+      "Nombre de la categoría padre",
+    ]
+
+    const instructionText = 'IMPORTANTE:\n' +
+      '1) Completa los datos de las categorías en las filas inferiores.\n' +
+      '2) No modifiques los nombres de las columnas.\n' +
+      '3) Revisa el manual (sección importación).\n' +
+      '4) Antes de subir el archivo, usa “Guardar como…” y elige formato CSV (delimitado por comas).\n' +
+      '5) Elimina esta fila de instrucciones y deja solo la fila de cabecera (name, description, parent, ...).'
+
+
+    // Creamos los datos de la hoja (primera fila headers, segunda fila ejemplo)
+    const worksheetData = [[instructionText], headers, exampleRow]
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+
+    // --- Estilos para la celda de instrucciones (A1) ---
+    const instructionCellRef = "A1"
+
+    if (!worksheet[instructionCellRef]) {
+      worksheet[instructionCellRef] = { t: "s", v: instructionText }
+    }
+
+    worksheet[instructionCellRef].s = {
+      font: {
+        color: { rgb: "FF0000" }, // rojo
+        bold: true,
+      },
+      alignment: {
+        wrapText: true, // que respete los saltos de línea
+        vertical: "top",
+      },
+    }
+
+    // Hacemos que la celda A1 se fusione hasta la última columna de headers
+    worksheet["!merges"] = [
+      {
+        s: { r: 0, c: 0 }, // start (row 0, col 0) -> A1
+        e: { r: 0, c: headers.length - 1 }, // end (misma fila, última col)
+      },
+    ]
+
+    // Ancho de columnas un poco más cómodo (opcional)
+    worksheet["!cols"] = headers.map(() => ({ wch: 20 }))
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template")
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    })
+
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "categorias_template.xlsx"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header con búsqueda y botón crear */}
@@ -337,6 +477,15 @@ export function CategoriesManager() {
                     <p className="text-sm">Organiza tus productos por categorías</p>
                   </div>
                 </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => setIsImportDialogOpen(true)} >
+                    Importación masiva
+                  </Button>
+                  <Button onClick={openCreateDialog}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nueva Categoría Padre
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -352,10 +501,7 @@ export function CategoriesManager() {
                     className="pl-10"
                   />
                 </div>
-                <Button onClick={openCreateDialog}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva Categoría Padre
-                </Button>
+                
               </div>
             </div>
             {/* Información de resultados */}
@@ -693,6 +839,118 @@ export function CategoriesManager() {
                   className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
                   >
                     Eliminar Categoría
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog de importación masiva */}
+            <Dialog
+              open={isImportDialogOpen}
+              onOpenChange={(open) => {
+                setIsImportDialogOpen(open)
+                if (!open) {
+                  setImportFile(null)
+                  setImportError(null) // limpiar errores al cerrar
+                }
+              }}
+            >
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Importación masiva</DialogTitle>
+                  <DialogDescription>
+                    Selecciona el tipo de importación y el archivo a subir.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+
+                  <div className="space-y-1">
+                    <label className="text-sm font-medium">Archivo</label>
+                    <input
+                      type="file"
+                      className="
+                        block w-full text-sm
+                        border border-gray-300 rounded-md
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-semibold
+                        file:bg-black file:text-white
+                        hover:file:bg-neutral-800
+                        cursor-pointer
+                      "
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null
+                        setImportFile(file)
+                        setImportError(null)
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <div>
+                       <p className="text-muted-foreground">
+                      Puedes descargar un excel de ejemplo con la estructura requerida.
+                    </p>
+                    <p className="text-muted-foreground my-2">
+                      <strong>
+                        Importante! Recuerda que debes guardarlo como CSV
+                      </strong>
+                    </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                      Descargar Excel ejemplo
+                    </Button>
+                  </div>
+
+                  {/* 🔴 Bloque de errores de importación */}
+                  {importError && (
+                    <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                      <p className="text-sm font-semibold text-destructive">
+                        {importError.message}
+                      </p>
+
+                      {importError.errors.length > 0 && (
+                        <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">
+                          {importError.errors.map((err, idx) => (
+                            <li key={idx}>{err}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex justify-end">
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs"
+                    >
+                      <a
+                        href="/ManualImportaciones.pdf"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Ver manual de importación (PDF)
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsImportDialogOpen(false)
+                      setImportFile(null)
+                      setImportError(null)
+                    }}
+                    className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleImportProducts} disabled={isImporting}>
+                    {isImporting ? "Importando..." : "Importar"}
                   </Button>
                 </DialogFooter>
               </DialogContent>

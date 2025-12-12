@@ -12,15 +12,15 @@ export class EcomerceService {
 
   static async getCategories(): Promise<ApiResponse<CategoryResponse>> {
     const categoriesStored = localStorage.getItem("categories")
-    console.log(categoriesStored, 'categoriesStored')
-    if (categoriesStored) {
-      try {
-        const parsed = JSON.parse(categoriesStored)
-        return parsed
-      } catch (e) {
-        console.error("Error parsing categories from localStorage", e)
-      }
-    }
+    // console.log(categoriesStored, 'categoriesStored')
+    // if (categoriesStored) {
+    //   try {
+    //     const parsed = JSON.parse(categoriesStored)
+    //     return parsed
+    //   } catch (e) {
+    //     console.error("Error parsing categories from localStorage", e)
+    //   }
+    // }
     const response = await apiClient.get<CategoryResponse>("categories")
     const features = response.data
     // localStorage.setItem("categories", JSON.stringify(features))
@@ -59,6 +59,21 @@ export class EcomerceService {
     }
     else if (response.error) {
       console.error("Error creating:", response.error)
+      return response
+    }
+    return response
+  }
+
+  static async uploadCategories(file: File): Promise<ApiResponse<any>> {
+    const formData = new FormData()
+    formData.append("csv_file", file)
+
+    const response = await apiClient.post<any>("categories/upload/", formData)
+
+    if (response.success) {
+      return response
+    } else if (response.error) {
+      console.error("Error uploading products:", response.error)
       return response
     }
     return response

@@ -38,6 +38,8 @@ import { ProductsService } from "@/services/ecomerce/products/products.service"
 import { AuthService } from "@/services/auth.service"
 import useSWR, { mutate } from "swr"
 import { useRouter } from "next/navigation"
+import { useToast } from "@/hooks/use-toast"
+import * as XLSX from "xlsx"
 
 interface ProductsManagerProps {
   siteId: string
@@ -56,8 +58,21 @@ export function ProductsManager({ siteId }: ProductsManagerProps) {
   const [principalHoverText, setPrincipalHoverText] = useState("")
   const [isLoading, setisLoading] = useState(true)
 
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importType, setImportType] = useState<"products" | "images">("products")
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<{
+    message: string
+    errors: string[]
+    products_created?: number
+    products_updated?: number
+  } | null>(null)
+
   // 👇 NUEVO: modo de vista (grid / list)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+
+  const { toast } = useToast()
 
   useEffect(() => {
     const rawUserData = localStorage.getItem("user_data")
@@ -164,10 +179,184 @@ export function ProductsManager({ siteId }: ProductsManagerProps) {
     }
   }
 
-  const router = useRouter()
-  const handleClick = (route: string) => {
-    setisLoading(true)
-    router.push(route)
+  const handleImportProducts = async () => {
+    if (!importFile) {
+      setImportError({
+        message: "Debes seleccionar un archivo para importar.",
+        errors: [],
+      })
+      return
+    }
+
+    if (importType === "products") {
+      setIsImporting(true)
+      try {
+        const res = await ProductsService.uploadProducts(importFile)
+
+        if (res.success) {
+          await mutate("products")
+          toast({
+            title: "Importación exitosa",
+            description: "La importación de productos se realizó correctamente.",
+          })
+          setIsImportDialogOpen(false)
+          setImportFile(null)
+          setImportError(null)
+        } else {
+          setImportError({
+            message: res.error || "Ocurrieron errores al importar los productos.",
+            errors: Array.isArray(res.data.errors) ? res.data.errors : [],
+            products_created: res.data?.products_created ?? 0,
+            products_updated: res.data?.products_updated ?? 0,
+          })
+        }
+      } catch (error) {
+        console.error("Error al importar productos", error)
+        setImportError({
+          message: "Error inesperado al importar productos.",
+          errors: [],
+          products_created: 0,
+          products_updated: 0,
+        })
+      } finally {
+        setIsImporting(false)
+      }
+    }
+    if (importType === "images") {
+      setIsImporting(true)
+      try {
+        const res = await ProductsService.uploadImagesProducts(importFile)
+        if (res.success) {
+          if (res.data.data.errors.length > 0) {
+            setImportError({
+              message:"Ocurrieron errores al importar las imágenes.",
+              errors: Array.isArray(res.data.data.errors) ? res.data.data.errors : [],
+            })
+            return
+          }
+          await mutate("products")
+          toast({
+            title: "Importación exitosa",
+            description: "Las imágenes de productos se importaron correctamente.",
+          })
+          setIsImportDialogOpen(false)
+          setImportFile(null)
+          setImportError(null)
+        } else {
+          setImportError({
+            message: res.error || "Ocurrieron errores al importar los productos.",
+            errors: Array.isArray(res.data.errors.zip_file) ? res.data.errors.zip_file : [],
+          })
+        }
+      } catch (error) {
+        setImportError({
+          message: "Error inesperado al importar productos.",
+          errors: [],
+        })
+      } finally {
+        setIsImporting(false)
+      }
+    }
+  }
+
+  const handleDownloadTemplate = () => {
+    const headers = [
+      "name",
+      "description",
+      "price",
+      "original_price",
+      "stock",
+      "sku",
+      "category_name",
+      "brand_name",
+      "update_existing",
+      "benefits",
+      "compatibilities",
+      "specifications",
+      "features",
+    ]
+
+    const instructionText = 'IMPORTANTE:\n' +
+      '1) Completa los datos de los productos en las filas inferiores.\n' +
+      '2) No modifiques los nombres de las columnas.\n' +
+      '3) Revisa el manual (sección importación).\n' +
+      '4) Antes de subir el archivo, usa “Guardar como…” y elige formato CSV (delimitado por comas).\n' +
+      '5) Elimina esta fila de instrucciones y deja solo la fila de cabecera (name, description, price, ...).'
+
+    // Opcional: fila de ejemplo
+    const exampleRow = [
+      "Producto ejemplo",
+      "Descripción del producto",
+      19990,
+      24990,
+      10,
+      "SKU-123",
+      "Categoría ejemplo (nombre)",
+      "Marca ejemplo",
+      "TRUE",
+      '[{"value":"Envío gratis","benefit_type":"delivery"}]',
+      "modelo A | modelo B",
+      "especificación 1 | especificación 2",
+      "característica 1 | característica 2",
+    ]
+
+    // Construimos la data de la hoja:
+    // fila 0: instrucciones
+    // fila 2: headers
+    // fila 3: ejemplo (opcional)
+    const worksheetData = [[instructionText],  headers, exampleRow]
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData)
+
+    // --- Estilos para la celda de instrucciones (A1) ---
+    const instructionCellRef = "A1"
+
+    if (!worksheet[instructionCellRef]) {
+      worksheet[instructionCellRef] = { t: "s", v: instructionText }
+    }
+
+    worksheet[instructionCellRef].s = {
+      font: {
+        color: { rgb: "FF0000" }, // rojo
+        bold: true,
+      },
+      alignment: {
+        wrapText: true, // que respete los saltos de línea
+        vertical: "top",
+      },
+    }
+
+    // Hacemos que la celda A1 se fusione hasta la última columna de headers
+    worksheet["!merges"] = [
+      {
+        s: { r: 0, c: 0 }, // start (row 0, col 0) -> A1
+        e: { r: 0, c: headers.length - 1 }, // end (misma fila, última col)
+      },
+    ]
+
+    // Ancho de columnas un poco más cómodo (opcional)
+    worksheet["!cols"] = headers.map(() => ({ wch: 20 }))
+
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Template")
+
+    const excelBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "array",
+    })
+
+    const blob = new Blob([excelBuffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    })
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.download = "products_template.xlsx"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   return (
@@ -192,10 +381,15 @@ export function ProductsManager({ siteId }: ProductsManagerProps) {
                     <p className="text-sm">Administra tu catálogo de productos</p>
                   </div>
                 </div>
-                <Button onClick={() => handleClick("/dashboard/ecommerce/products/create")}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Producto
-                </Button>
+                <div className="flex gap-2">
+                  <Button onClick={() => setIsImportDialogOpen(true)} >
+                    Importación masiva
+                  </Button>
+                  <Button onClick={() => handleClick("/dashboard/ecommerce/products/create")}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo Producto
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -492,6 +686,138 @@ export function ProductsManager({ siteId }: ProductsManagerProps) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {/* Dialog de importación masiva */}
+          <Dialog
+            open={isImportDialogOpen}
+            onOpenChange={(open) => {
+              setIsImportDialogOpen(open)
+              if (!open) {
+                setImportFile(null)
+                setImportError(null) // limpiar errores al cerrar
+              }
+            }}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Importación masiva</DialogTitle>
+                <DialogDescription>
+                  Selecciona el tipo de importación y el archivo a subir.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium">Tipo de importación</label>
+                  <select
+                    value={importType}
+                    onChange={(e) => setImportType(e.target.value as "products" | "images")}
+                    className="w-full p-2 border border-border rounded-md bg-background"
+                  >
+                    <option value="products">Productos</option>
+                    <option value="images">Imágenes de productos</option>
+                  </select>
+                </div>
+
+                {importType === "images" && (
+                  <p className="text-xs text-muted-foreground">
+                    Para importar imágenes debes subir un archivo .zip con las imágenes correspondientes.
+                  </p>
+                )}
+
+               <div className="space-y-1">
+                  <label className="text-sm font-medium">Archivo</label>
+                  <input
+                    type="file"
+                    className="
+                      block w-full text-sm
+                      border border-gray-300 rounded-md
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-md file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-black file:text-white
+                      hover:file:bg-neutral-800
+                      cursor-pointer
+                    "
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null
+                      setImportFile(file)
+                      setImportError(null)
+                    }}
+                  />
+                </div>
+
+                {importType === "products" && (
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <div>
+                       <p className="text-muted-foreground">
+                      Puedes descargar un excel de ejemplo con la estructura requerida.
+                    </p>
+                    <p className="text-muted-foreground">
+                      <strong>
+                        Importante! Recuerda que debes guardarlo como CSV
+                      </strong>
+                    </p>
+                    </div>
+                    <Button type="button" variant="outline" size="sm" onClick={handleDownloadTemplate}>
+                      Descargar Excel ejemplo
+                    </Button>
+                  </div>
+                )}
+
+                {/* 🔴 Bloque de errores de importación */}
+                {importError && (
+                  <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                    <p className="text-sm font-semibold text-destructive">
+                      {importError.message}
+                    </p>
+
+                    {importError.errors.length > 0 && (
+                      <ul className="mt-2 list-disc space-y-1 pl-4 text-xs">
+                        {importError.errors.map((err, idx) => (
+                          <li key={idx}>{err}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                <div className="flex justify-end">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    <a
+                      href="/ManualImportaciones.pdf"
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ver manual de importación (PDF)
+                    </a>
+                  </Button>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsImportDialogOpen(false)
+                    setImportFile(null)
+                    setImportError(null)
+                  }}
+                  className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleImportProducts} disabled={isImporting}>
+                  {isImporting ? "Importando..." : "Importar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
         </div>
       )}
     </div>

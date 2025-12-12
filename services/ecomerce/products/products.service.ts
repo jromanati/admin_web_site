@@ -205,6 +205,36 @@ export class ProductsService {
     return response
   }
 
+  static async uploadProducts(file: File): Promise<ApiResponse<any>> {
+    const formData = new FormData()
+    formData.append("csv_file", file)
+
+    const response = await apiClient.post<any>("products/upload/", formData)
+
+    if (response.success) {
+      return response
+    } else if (response.error) {
+      console.error("Error uploading products:", response.error)
+      return response
+    }
+    return response
+  }
+
+  static async uploadImagesProducts(file: File): Promise<ApiResponse<any>> {
+    const formData = new FormData()
+    formData.append("zip_file", file)
+
+    const response = await apiClient.post<any>("products/upload-images/", formData)
+
+    if (response.success) {
+      return response
+    } else if (response.error) {
+      console.error("Error uploading image:", response)
+      return response
+    }
+    return response
+  }
+
 
   // static async deleteFeature(id:number): Promise<ApiResponse<Feature>> {
   //   const response = await apiClient.delete<Feature>(`features/${id}/delete/`)

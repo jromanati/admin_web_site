@@ -24,7 +24,8 @@ import {
   Palette,
   Star,
   Video,
-  HelpCircle
+  HelpCircle,
+  FileText
 } from "lucide-react"
 
 interface AdminSidebarProps {
@@ -47,6 +48,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
   const [hasReviews, setHasReviews] = useState(false)
   const [hasStreaming, setHasStreaming] = useState(false)
   const [hasAtributes, setHasAtributes] = useState(false)
+  const [hasBlogs, setHasBlogs] = useState(false)
 
 
   useEffect(() => {
@@ -63,6 +65,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
       setHasReviews(extra_modules.includes("reviews"))
       setHasStreaming(extra_modules.includes("streaming"))
       setHasAtributes(extra_modules.includes("attributes"))
+      setHasBlogs(extra_modules.includes("blogs"))
     }
     
     if (tenant_data.styles_site){
@@ -125,6 +128,15 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
           icon: Video,
           label: "Gestionar Streaming",
           href: `/dashboard/ecommerce/streaming`,
+        },
+      )
+    }
+    if (hasBlogs) {
+      extraModuleItems.push(
+        {
+          icon: FileText,
+          label: "Gestionar Blogs",
+          href: `/dashboard/ecommerce/blogs`,
         },
       )
     }

@@ -234,7 +234,7 @@ export default function EditProductPage() {
       stock: parseInt(formData.stock),
       sku: formData.sku,
       category: selectedCategory?.id,
-      is_new: formData.is_new === "true" ? true : false,
+      is_new: isNew,
       is_active: true,
       images: images,
       features: featuresDetailIds,

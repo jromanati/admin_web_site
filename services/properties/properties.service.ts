@@ -11,20 +11,14 @@ export class PropertiesService {
   }
 
   static async getProperties(): Promise<ApiResponse<Property>> {
-    // const propertiesStored = localStorage.getItem("properties")
-    // console.log(propertiesStored, 'categoriesStored')
-    // if (propertiesStored) {
-    //   try {
-    //     const parsed = JSON.parse(propertiesStored)
-    //     return parsed
-    //   } catch (e) {
-    //     console.error("Error parsing properties from localStorage", e)
-    //   }
-    // }
     const response = await apiClient.get<Property>("properties")
     const features = response.data
     localStorage.setItem("properties", JSON.stringify(features))
     return response.data
+  }
+
+  static async getPropertyById(propertyId: number): Promise<ApiResponse<Property>> {
+    return apiClient.get<Property>(`properties/${propertyId}/update`)
   }
 
   static async createProperty(property: Property): Promise<ApiResponse<Property>> {

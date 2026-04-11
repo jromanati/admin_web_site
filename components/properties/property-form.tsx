@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
-import { Save, X, Upload } from "lucide-react"
+import { Save, X, Upload, Trash2, Sparkles, TrendingUp, Wand2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { regions, communes } from "@/data/adminData"
 import {
@@ -17,9 +17,14 @@ import {
 import type { Property } from "@/types/properties/properties"
 import VideoUpload from "@/components/ui/video-upload"
 import MapEmbed from "@/components/ui/map-embed"
+import { AIDescriptionModal } from "@/components/properties/ai-description-modal"
+import { AIValuationModal } from "@/components/properties/ai-valuation-modal"
+import { AIImageEnhancerModal } from "@/components/properties/ai-image-enhancer-modal"
+import { AIImageAnalyzeModal } from "@/components/properties/ai-image-analyze-modal"
 
 interface PropertyFormProps {
   initialData?: Partial<Property>
+  propertyId?: string
   onSubmit: (data: Property) => void
   onCancel: () => void
   isSending?: boolean
@@ -126,7 +131,7 @@ const formatNumberForInput = (num: number, allowDecimals: boolean) => {
   }).format(num)
 }
 
-const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = false }: PropertyFormProps) => {
+const PropertyFormComponent = ({ initialData, propertyId, onSubmit, onCancel, isSending = false }: PropertyFormProps) => {
   const [selectedRegion, setSelectedRegion] = useState(initialData?.region || "")
   const [availableCommunes, setAvailableCommunes] = useState<string[]>([])
   const [images, setImages] = useState<File[]>([])
@@ -140,6 +145,12 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
   const [principalHoverBackground, setPrincipalHoverBackground] = useState("")
   const [secondHoverBackground, setSecondHoverBackground] = useState("")
   const [principalHoverText, setPrincipalHoverText] = useState("")
+  // AI Tools modals
+  const [showAIDescriptionModal, setShowAIDescriptionModal] = useState(false)
+  const [showAIValuationModal, setShowAIValuationModal] = useState(false)
+  const [showAIImageModal, setShowAIImageModal] = useState(false)
+  const [selectedImageForAI, setSelectedImageForAI] = useState<{ url: string; index: number } | null>(null)
+  const [hasIA, setHasIA] = useState(false)
 
   useEffect(() => {
     if (initialData && initialData.video){
@@ -150,6 +161,10 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     }
     const rawClientData = localStorage.getItem("tenant_data")
     const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
+    const extra_modules = tenant_data ? tenant_data.extras_modules : []
+    if (extra_modules && extra_modules.length > 0){
+      setHasIA(extra_modules.includes("ia_module"))
+    }
     if (tenant_data?.styles_site){
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
       setPrincipalText(tenant_data.styles_site.principal_text)
@@ -174,26 +189,26 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
       featured: false,
       show_map: false,
       map_src: "",
-      built_area: undefined,
-      land_area: undefined,
+      built_area: 0,
+      land_area: 0,
       electricity: false,
       water: "",
       description: "",
       amenities: "",
       characteristics: "",
-      price: undefined, // lo convertiremos de string formateado a número en onSubmit
+      price: 0, // lo convertiremos de string formateado a número en onSubmit
       currency: "CLP",
       price_type: PriceTypeEnum.FIJO,
       operation: OperationEnum.VENTA,
       state: StateEnum.NUEVA,
       property_state: PropertyStateEnum.DISPONIBLE,
       property_type: PropertyTypeEnum.CASA,
-      bedrooms: undefined,
-      bathrooms: undefined,
+      bedrooms: 0,
+      bathrooms: 0,
       region: "",
       commune: "",
       address: "",
-      parking: undefined,
+      parking: 0,
       storage: false,
       mainImage: null,
       images: [],
@@ -373,6 +388,46 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowDecimals])
 
+
+  // AI Tools handlers
+  const handleApplyAIDescription = (description: string) => {
+    setValue("description", description)
+  }
+
+  const handleApplyAIValuation = (price: number, currency: string) => {
+    setValue("price", price)
+    setValue("currency", currency)
+  }
+
+  const handleOpenAIImageModal = (imageUrl: string, index: number) => {
+    setSelectedImageForAI({ url: imageUrl, index })
+    setShowAIImageModal(true)
+  }
+
+  const handleAnalysisComplete = (executionId: string) => {
+    if (!selectedImageForAI) return
+    const imageObj: any = images[selectedImageForAI.index]
+    const imageId = imageObj?.id
+    window.location.href = `/dashboard/properties/properties/ai-image-pipeline?imageId=${encodeURIComponent(
+      String(imageId)
+    )}&executionId=${encodeURIComponent(executionId)}&imageUrl=${encodeURIComponent(selectedImageForAI.url)}&propertyId=${encodeURIComponent(
+      String(propertyId ?? "")
+    )}`
+  }
+
+  // const handleApplyAIImage = (newImageUrl: string) => {
+  //   if (selectedImageForAI !== null) {
+  //     const updatedImages = [...images]
+  //     updatedImages[selectedImageForAI.index] = newImageUrl
+  //     setImages(updatedImages)
+  //     setValue("images", updatedImages)
+  //   }
+  //   setSelectedImageForAI(null)
+  // }
+
+  // Get current form values for AI tools
+  const currentFormValues = watch()
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200">
       <div className="p-6 border-b border-gray-200">
@@ -469,55 +524,58 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
         </div>
 
         {/* Precio */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Moneda</label>
-            <select
-              {...register("currency")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="CLP">CLP</option>
-              <option value="USD">USD</option>
-              <option value="UF">UF</option>
-            </select>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-gray-700">Precio</h3>
+            {hasIA && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAIValuationModal(true)}
+                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+              >
+                <TrendingUp className="h-4 w-4 mr-1" />
+                Tasación con IA
+              </Button>
+            )}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Precio</label>
-            <input
-              type="text"
-              inputMode={allowDecimals ? "decimal" : "numeric"}
-              placeholder={allowDecimals ? "0,00" : "0"}
-              {...register("price" as any, {
-                validate: (v: any) => {
-                  const num = typeof v === "number" ? v : parseAmountToNumber(String(v || ""))
-                  if (num < 0) return "El precio no puede ser negativo"
-                  return true
-                },
-              })}
-              onKeyDown={(e) => allowDecimalKey(e, allowDecimals)}
-              onChange={handlePriceChange}
-              onPaste={handlePricePaste}
-              onBlur={(e) => {
-                e.target.value = formatAmount(e.target.value, allowDecimals)
-                setValue("price" as any, e.target.value as any, { shouldValidate: true })
-              }}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-            {errors.price && <p className="mt-1 text-sm text-red-600">{String(errors.price.message)}</p>}
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Monto</label>
+              <input
+                type="number"
+                {...register("price", { min: 0 })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="0"
+              />
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Precio</label>
-            <select
-              {...register("price_type")}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              {Object.values(PriceTypeEnum).map((type) => (
-                <option key={type} value={type}>
-                  {type}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Moneda</label>
+              <select
+                {...register("currency")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="CLP">CLP</option>
+                <option value="USD">USD</option>
+                <option value="UF">UF</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de Precio</label>
+              <select
+                {...register("price_type")}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {Object.values(PriceTypeEnum).map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -633,7 +691,21 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
 
         {/* Descripción */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Descripción</label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="block text-sm font-medium text-gray-700">Descripción</label>
+            {hasIA && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAIDescriptionModal(true)}
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+              >
+                <Sparkles className="h-4 w-4 mr-1" />
+                Generar con IA
+              </Button>
+            )}
+          </div>
           <textarea
             {...register("description")}
             rows={30}
@@ -738,6 +810,22 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
                       alt={`Producto ${index + 1}`}
                       className="w-full h-32 object-cover rounded-lg border"
                     />
+                    {propertyId && hasIA && (image as any)?.id && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleOpenAIImageModal(
+                            (image as any).url ? (image as any).url : URL.createObjectURL(image),
+                            index
+                          )
+                        }
+                        className="absolute inset-0 rounded-lg bg-black/0 hover:bg-black/25 opacity-0 hover:opacity-100 transition flex items-start justify-end p-2"
+                      >
+                        <span className="inline-flex items-center justify-center h-9 w-9 rounded-full bg-white/90 text-violet-700 shadow">
+                          <Wand2 className="h-5 w-5" />
+                        </span>
+                      </button>
+                    )}
                     <Button
                       type="button"
                       variant="destructive"
@@ -836,6 +924,69 @@ const PropertyFormComponent = ({ initialData, onSubmit, onCancel, isSending = fa
           </button>
         </div>
       </form>
+      {/* AI Tools Modals */}
+      <AIDescriptionModal
+        open={showAIDescriptionModal}
+        onOpenChange={setShowAIDescriptionModal}
+        propertyId={propertyId}
+        propertyData={{
+          property_type: currentFormValues.property_type,
+          operation: currentFormValues.operation,
+          region: currentFormValues.region,
+          commune: currentFormValues.commune,
+          bedrooms: currentFormValues.bedrooms,
+          bathrooms: currentFormValues.bathrooms,
+          built_area: currentFormValues.built_area,
+          land_area: currentFormValues.land_area,
+          parking: currentFormValues.parking,
+          amenities: currentFormValues.amenities,
+          characteristics: currentFormValues.characteristics,
+        }}
+        onApply={handleApplyAIDescription}
+      />
+      <AIValuationModal
+        open={showAIValuationModal}
+        onOpenChange={setShowAIValuationModal}
+        propertyId={propertyId}
+        propertyData={{
+          property_type: currentFormValues.property_type,
+          operation: currentFormValues.operation,
+          region: currentFormValues.region,
+          commune: currentFormValues.commune,
+          bedrooms: currentFormValues.bedrooms,
+          bathrooms: currentFormValues.bathrooms,
+          built_area: currentFormValues.built_area,
+          land_area: currentFormValues.land_area,
+          parking: currentFormValues.parking,
+          state: currentFormValues.state,
+        }}
+        onApply={handleApplyAIValuation}
+      />
+
+      {selectedImageForAI && (
+        <AIImageAnalyzeModal
+          open={showAIImageModal}
+          onOpenChange={(open) => {
+            setShowAIImageModal(open)
+            if (!open) setSelectedImageForAI(null)
+          }}
+          imageId={(images[selectedImageForAI.index] as any)?.id}
+          imageUrl={selectedImageForAI.url}
+          onAnalysisComplete={handleAnalysisComplete}
+        />
+      )}
+
+      {/* {selectedImageForAI && (
+        <AIImageEnhancerModal
+          open={showAIImageModal}
+          onOpenChange={(open) => {
+            setShowAIImageModal(open)
+            if (!open) setSelectedImageForAI(null)
+          }}
+          imageUrl={selectedImageForAI.url}
+          onApply={handleApplyAIImage}
+        />
+      )} */}
     </div>
   )
 }

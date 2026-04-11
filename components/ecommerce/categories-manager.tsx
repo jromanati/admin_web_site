@@ -61,24 +61,26 @@ export function CategoriesManager() {
     const categoriesResponse = await EcomerceService.getCategories()
     setisLoading(false)
     const fetchedCategories = categoriesResponse || []
-    return fetchedCategories.map((category: any) => ({
-      ...category,
-    }))
+    return fetchedCategories
   }
   const { data: categories = [] } = useSWR('categories', fetchCategories)
   const [searchTerm, setSearchTerm] = useState("")
-  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set())
+  const [expandedNodes, setExpandedNodes] = useState<Set<number>>(new Set())
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isLoading, setisLoading] = useState(true)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
   const [isCreateSubcategoryDialogOpen, setIsCreateSubcategoryDialogOpen] = useState(false)
   const [parentCategoryForSubcategory, setParentCategoryForSubcategory] = useState<Category | null>(null)
+  const [principalImageFile, setPrincipalImageFile] = useState<File | null>(null)
+  const [viewMode, setViewMode] = useState<"list" | "cards">("list")
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 20
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     parent: "",
-    status: "active" as "active" | "inactive",
+    is_active: true,
   })
   const [secondBackgroundColor, setSecondBackgroundColor] = useState("")
   const [thirdBackgroundColor, setThirdBackgroundColor] = useState("")
@@ -91,7 +93,7 @@ export function CategoriesManager() {
   useEffect(() => {
       const rawUserData = localStorage.getItem("user_data")
       const rawClientData = localStorage.getItem("tenant_data")
-      const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
+      const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
       if (tenant_data.styles_site){
         setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
         setThirdBackgroundColor(tenant_data.styles_site.background_color)
@@ -109,12 +111,12 @@ export function CategoriesManager() {
   const filteredCategories = useMemo(() => {
     if (!searchTerm) return categories
 
-    const matchingIds = new Set<string>()
+    const matchingIds = new Set<number>()
 
     const addCategoryAndAncestors = (category: Category) => {
       matchingIds.add(category.id)
-      if (category.parent) {
-        const parent = categories.find((c) => c.id === category.parent)
+      if (typeof category.parent === "number") {
+        const parent = categories.find((c: Category) => c.id === category.parent)
         if (parent && !matchingIds.has(parent.id)) {
           addCategoryAndAncestors(parent)
         }
@@ -123,7 +125,7 @@ export function CategoriesManager() {
 
     
 
-    categories.forEach((category) => {
+    categories.forEach((category: Category) => {
       const nameMatch = category.name.toLowerCase().includes(searchTerm.toLowerCase())
       const descMatch = category.description.toLowerCase().includes(searchTerm.toLowerCase())
 
@@ -131,10 +133,10 @@ export function CategoriesManager() {
         addCategoryAndAncestors(category)
 
         // Incluir hijos
-        const addChildren = (parentId: string) => {
+        const addChildren = (parentId: number) => {
           categories
-            .filter((c) => c.parent === parentId)
-            .forEach((child) => {
+            .filter((c: Category) => c.parent === parentId)
+            .forEach((child: Category) => {
               matchingIds.add(child.id)
               addChildren(child.id)
             })
@@ -144,8 +146,12 @@ export function CategoriesManager() {
       }
     })
     setisLoading(false);
-    return categories.filter((cat) => matchingIds.has(cat.id))
+    return categories.filter((cat: Category) => matchingIds.has(cat.id))
   }, [categories, searchTerm])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm])
 
   const categoryTree = useMemo(() => {
     const buildCategoryTree = (categories: Category[], parent: number | null = null, level = 0): CategoryTreeNode[] => {
@@ -178,8 +184,18 @@ export function CategoriesManager() {
     return result
   }, [categoryTree])
 
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(visibleNodes.length / pageSize))
+  }, [visibleNodes.length])
 
-  const toggleExpansion = (categoryId: string) => {
+  const paginatedNodes = useMemo(() => {
+    const page = Math.min(Math.max(currentPage, 1), totalPages)
+    const start = (page - 1) * pageSize
+    return visibleNodes.slice(start, start + pageSize)
+  }, [currentPage, totalPages, visibleNodes])
+
+
+  const toggleExpansion = (categoryId: number) => {
     const newExpanded = new Set(expandedNodes)
     if (newExpanded.has(categoryId)) {
       newExpanded.delete(categoryId)
@@ -195,16 +211,18 @@ export function CategoriesManager() {
       name: formData.name,
       description: formData.description,
       products_count: 0,
-      status: "active",
-      parent: formData.parent || null,
+      status: formData.is_active ? "active" : "inactive",
+      is_active: formData.is_active,
+      parent: formData.parent ? Number(formData.parent) : null,
     }
 
-    const response = await EcomerceService.createCategory(newCategory)
+    const response = await EcomerceService.createCategory(newCategory, principalImageFile)
 
-    if (response.success) {
+    const createdCategory = response.success ? response.data : undefined
+    if (createdCategory) {
       // mutate('categories', (current: Category[] = []) => [...current, response.data], false)
       mutate('categories', (current: Category[] = []) => {
-        const updated = [...current, response.data] // ejemplo crear
+        const updated = [...current, createdCategory] // ejemplo crear
         localStorage.setItem("categories", JSON.stringify(updated))
         return updated
       }, false)
@@ -219,16 +237,18 @@ export function CategoriesManager() {
       name: formData.name,
       description: formData.description,
       products_count: 0,
-      status: "active",
+      status: formData.is_active ? "active" : "inactive",
+      is_active: formData.is_active,
       parent: parentCategoryForSubcategory?.id || null,
     }
 
-    const response = await EcomerceService.createCategory(newCategory)
+    const response = await EcomerceService.createCategory(newCategory, principalImageFile)
 
-    if (response.success) {
+    const createdCategory = response.success ? response.data : undefined
+    if (createdCategory) {
       // mutate('categories', (current: Category[] = []) => [...current, response.data], false)
       mutate('categories', (current: Category[] = []) => {
-        const updated = [...current, response.data] // ejemplo crear
+        const updated = [...current, createdCategory] // ejemplo crear
         localStorage.setItem("categories", JSON.stringify(updated))
         return updated
       }, false)
@@ -241,11 +261,12 @@ export function CategoriesManager() {
 
   const handleEditCategory = (category: Category) => {
     setEditingCategory(category)
+    setPrincipalImageFile(null)
     setFormData({
       name: category.name,
       description: category.description,
-      parent: category.parent || "",
-      status: category.status,
+      parent: typeof category.parent === "number" ? String(category.parent) : "",
+      is_active: typeof category.is_active === "boolean" ? category.is_active : category.status === "active",
     })
   }
 
@@ -256,15 +277,18 @@ export function CategoriesManager() {
       ...editingCategory,
       name: formData.name,
       description: formData.description,
-      parent: formData.parent || null,
+      parent: formData.parent ? Number(formData.parent) : null,
+      is_active: formData.is_active,
+      status: formData.is_active ? "active" : "inactive",
     }
 
-    const response = await EcomerceService.updateCategory(updatedCategory, editingCategory.id)
+    const response = await EcomerceService.updateCategory(updatedCategory, editingCategory.id, principalImageFile)
 
-    if (response.success) {
+    const updatedCategoryFromApi = response.success ? response.data : undefined
+    if (updatedCategoryFromApi) {
       mutate('categories', (current: Category[] = []) => {
         const updated = current.map(cat =>
-          cat.id === editingCategory.id ? response.data : cat
+          cat.id === editingCategory.id ? updatedCategoryFromApi : cat
         )
         localStorage.setItem("categories", JSON.stringify(updated))
         return updated
@@ -280,7 +304,7 @@ export function CategoriesManager() {
   }
 
   const deleteCategory = async (categoryId: string) => {
-    const response = await EcomerceService.deleteCategory(categoryId)
+    const response = await EcomerceService.deleteCategory(Number(categoryId))
 
     if (response.success) {
       mutate('categories', (current: Category[] = []) => {
@@ -315,11 +339,12 @@ export function CategoriesManager() {
       name: "",
       description: "",
       parent: "",
-      status: "active",
+      is_active: true,
     })
+    setPrincipalImageFile(null)
   }
-  const getSubcategoryCount = (categoryId: string) => {
-    return categories.filter((cat) => cat.parent === categoryId).length
+  const getSubcategoryCount = (categoryId: number) => {
+    return categories.filter((cat: Category) => cat.parent === categoryId).length
   }
 
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
@@ -501,6 +526,7 @@ export function CategoriesManager() {
                     className="pl-10"
                   />
                 </div>
+
                 
               </div>
             </div>
@@ -543,9 +569,9 @@ export function CategoriesManager() {
                       </div>                    
                     )}
                   </div>
-                ) : (
+                ) : viewMode === "list" ? (
                   <div className="divide-y divide-border">
-                    {visibleNodes.map((node, index) => (
+                    {paginatedNodes.map((node) => (
                       <div
                         key={node.id}
                         className="p-4 transition-colors border-b border-border/50 last:border-b-0"
@@ -581,11 +607,23 @@ export function CategoriesManager() {
                               )}
                             </div>
 
+                            <div className="h-10 w-10 rounded-md bg-muted overflow-hidden flex items-center justify-center">
+                              {node.image_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={node.image_url} alt={node.name} className="h-full w-full object-cover" />
+                              ) : (
+                                <Tag className="h-4 w-4 text-muted-foreground" />
+                              )}
+                            </div>
+
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
                                 <h3 className="">{node.name}</h3>
-                                <Badge variant={node.status === "active" ? "default" : "secondary"} className="text-xs">
-                                  {node.status === "active" ? "Activa" : "Inactiva"}
+                                <Badge
+                                  variant={(typeof node.is_active === "boolean" ? node.is_active : node.status === "active") ? "default" : "secondary"}
+                                  className="text-xs"
+                                >
+                                  {(typeof node.is_active === "boolean" ? node.is_active : node.status === "active") ? "Activa" : "Inactiva"}
                                 </Badge>
                               </div>
                               <p className="text-sm mb-1">{node.description}</p>
@@ -623,9 +661,95 @@ export function CategoriesManager() {
                       </div>
                     ))}
                   </div>
+                ) : (
+                  <div className="p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {paginatedNodes.map((node) => (
+                        <Card key={node.id} className="overflow-hidden">
+                          <div className="h-32 bg-muted overflow-hidden">
+                            {node.image_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={node.image_url} alt={node.name} className="h-full w-full object-cover" />
+                            ) : (
+                              <div className="h-full w-full flex items-center justify-center">
+                                <Tag className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                          </div>
+                          <CardContent className="p-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-medium line-clamp-1">{node.name}</h3>
+                              <Badge
+                                variant={(typeof node.is_active === "boolean" ? node.is_active : node.status === "active") ? "default" : "secondary"}
+                                className="text-xs"
+                              >
+                                {(typeof node.is_active === "boolean" ? node.is_active : node.status === "active") ? "Activa" : "Inactiva"}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{node.description}</p>
+                            <div className="flex gap-4 text-xs text-muted-foreground mb-3">
+                              <span>{node.products_count} productos</span>
+                              {node.children.length > 0 && <span>{node.children.length} subcategorías</span>}
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openCreateSubcategoryDialog(node)}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleEditCategory(node)}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDeleteCategory(node)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </CardContent>
             </Card>
+
+            {visibleNodes.length > 0 && (
+              <div className="flex items-center justify-between mt-4">
+                <p className="text-sm text-muted-foreground">
+                  Página {Math.min(currentPage, totalPages)} de {totalPages}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage <= 1}
+                  >
+                    Anterior
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage >= totalPages}
+                  >
+                    Siguiente
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogContent>
@@ -655,17 +779,35 @@ export function CategoriesManager() {
                   <div>
                     <Label htmlFor="status">Estado</Label>
                     <Select
-                      value={formData.status}
-                      onValueChange={(value: "active" | "inactive") => setFormData({ ...formData, status: value })}
+                      value={formData.is_active ? "true" : "false"}
+                      onValueChange={(value: "true" | "false") =>
+                        setFormData({ ...formData, is_active: value === "true" })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Activa</SelectItem>
-                        <SelectItem value="inactive">Inactiva</SelectItem>
+                        <SelectItem value="true">Activa</SelectItem>
+                        <SelectItem value="false">Inactiva</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="principal-image">Imagen principal</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Esta imagen se mostrará en el listado de categorías.
+                    </p>
+                    <input
+                      id="principal-image"
+                      type="file"
+                      accept="image/*"
+                      className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-muted file:text-foreground hover:file:bg-muted/80"
+                      onChange={(e) => setPrincipalImageFile(e.target.files?.[0] || null)}
+                    />
+                    {principalImageFile?.name && (
+                      <p className="text-xs text-muted-foreground">Archivo seleccionado: {principalImageFile.name}</p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -718,17 +860,35 @@ export function CategoriesManager() {
                   <div>
                     <Label htmlFor="sub-status">Estado</Label>
                     <Select
-                      value={formData.status}
-                      onValueChange={(value: "active" | "inactive") => setFormData({ ...formData, status: value })}
+                      value={formData.is_active ? "true" : "false"}
+                      onValueChange={(value: "true" | "false") =>
+                        setFormData({ ...formData, is_active: value === "true" })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Activa</SelectItem>
-                        <SelectItem value="inactive">Inactiva</SelectItem>
+                        <SelectItem value="true">Activa</SelectItem>
+                        <SelectItem value="false">Inactiva</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="sub-principal-image">Imagen principal</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Esta imagen se mostrará en el listado de categorías.
+                    </p>
+                    <input
+                      id="sub-principal-image"
+                      type="file"
+                      accept="image/*"
+                      className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-muted file:text-foreground hover:file:bg-muted/80"
+                      onChange={(e) => setPrincipalImageFile(e.target.files?.[0] || null)}
+                    />
+                    {principalImageFile?.name && (
+                      <p className="text-xs text-muted-foreground">Archivo seleccionado: {principalImageFile.name}</p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -775,17 +935,46 @@ export function CategoriesManager() {
                   <div>
                     <Label htmlFor="edit-status">Estado</Label>
                     <Select
-                      value={formData.status}
-                      onValueChange={(value: "active" | "inactive") => setFormData({ ...formData, status: value })}
+                      value={formData.is_active ? "true" : "false"}
+                      onValueChange={(value: "true" | "false") =>
+                        setFormData({ ...formData, is_active: value === "true" })
+                      }
                     >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">Activa</SelectItem>
-                        <SelectItem value="inactive">Inactiva</SelectItem>
+                        <SelectItem value="true">Activa</SelectItem>
+                        <SelectItem value="false">Inactiva</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-principal-image">Imagen principal</Label>
+                    {editingCategory?.image_url && (
+                      <div className="flex items-center gap-3">
+                        <div className="h-14 w-14 rounded-md bg-muted overflow-hidden flex items-center justify-center">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={editingCategory.image_url}
+                            alt={editingCategory.name}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+                        <p className="text-xs text-muted-foreground">Imagen actual</p>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">Selecciona una nueva imagen para reemplazar la actual.</p>
+                    <input
+                      id="edit-principal-image"
+                      type="file"
+                      accept="image/*"
+                      className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-muted file:text-foreground hover:file:bg-muted/80"
+                      onChange={(e) => setPrincipalImageFile(e.target.files?.[0] || null)}
+                    />
+                    {principalImageFile?.name && (
+                      <p className="text-xs text-muted-foreground">Archivo seleccionado: {principalImageFile.name}</p>
+                    )}
                   </div>
                 </div>
                 <DialogFooter>
@@ -823,8 +1012,8 @@ export function CategoriesManager() {
                     <ul className="text-sm text-red-700 mt-2 space-y-1">
                       <li>• La categoría "{categoryToDelete?.name}"</li>
                       <li>• {categoryToDelete?.products_count || 0} productos asociados</li>
-                      {getSubcategoryCount(categoryToDelete?.id || "") > 0 && (
-                        <li>• {getSubcategoryCount(categoryToDelete?.id || "")} subcategorías y sus productos</li>
+                      {typeof categoryToDelete?.id === "number" && getSubcategoryCount(categoryToDelete.id) > 0 && (
+                        <li>• {getSubcategoryCount(categoryToDelete.id)} subcategorías y sus productos</li>
                       )}
                     </ul>
                   </div>

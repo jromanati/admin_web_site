@@ -2,7 +2,7 @@
 
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useParams } from "next/navigation"
 import { mutate } from "swr"
@@ -13,12 +13,13 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Upload, X, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Upload, X, Plus, Trash2, Eye } from "lucide-react"
 import { CategorySelector } from "@/components/ecommerce/category-selector"
 import { AttributesSelector } from "@/components/ecommerce/attributes-selector"
 import { AdminSidebar } from "@/components/admin-sidebar"
 import { AuthService } from "@/services/auth.service"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ProductPreviewModal } from "@/components/ecommerce/product-preview-modal"
 
 import { ProductsService } from "@/services/ecomerce/products/products.service"
 import type { 
@@ -26,16 +27,11 @@ import type {
   ProductCompatibilitiesGroup,
   ProductBenefitsGroup
 } from "@/types/ecomerces/products"
+import type { ProductImage } from "@/types/ecomerces/products"
 import type { Category } from "@/types/ecomerces/categories"
 import type { Feature } from "@/types/ecomerces/features"
 import { BrandSelector } from "@/components/ecommerce/brand-selector"
-
-interface Brand {
-  id: string
-  name: string
-  logo_url?: string
-  is_active: boolean
-}
+import type { Brand } from "@/types/ecomerces/brands"
 
 export default function EditProductPage() {
   const { id } = useParams()
@@ -51,9 +47,9 @@ export default function EditProductPage() {
     sku: "",
     is_new: "",
   })
-  const [existingImages, setExistingImages] = useState<{ id: number; url: string; public_id: string }[]>([])
+  const [existingImages, setExistingImages] = useState<ProductImage[]>([])
   const [deletedImagePublicIds, setDeletedImagePublicIds] = useState<string[]>([])
-  const [images, setImages] = useState<File[]>([])
+  const [images, setImages] = useState<(File | ProductImage)[]>([])
   const [selectedCategory, setSelectedCategory] = useState<any>()
   const [selectedAttributes, setSelectedAttributes] = useState<{ [key: string]: string[] }>({})
   const [mainImage, setMainImage] = useState<File>()
@@ -82,10 +78,63 @@ export default function EditProductPage() {
   const [hasAtributes, setHasAtributes] = useState(false)
   
   const [isNew, setIsNew] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+
+  const previewData = useMemo(() => {
+    const mainImageUrl = mainImageExist
+      ? mainImageExist
+      : mainImage
+        ? URL.createObjectURL(mainImage)
+        : undefined
+
+    const extraImageUrls = images
+      .map((img: any) => {
+        if (img && typeof img.url === "string") return img.url
+        if (typeof File !== "undefined" && img instanceof File) return URL.createObjectURL(img)
+        return undefined
+      })
+      .filter(Boolean) as string[]
+
+    return {
+      name: formData.name,
+      description: formData.description,
+      price: formData.price ? Number(formData.price) : null,
+      original_price: formData.original_price ? Number(formData.original_price) : (formData.price ? Number(formData.price) : null),
+      stock: formData.stock ? Number(formData.stock) : null,
+      sku: formData.sku,
+      brand_name: selectedBrand?.name,
+      category_name: selectedCategory?.name,
+      is_new: isNew,
+      is_active: true,
+      images: [
+        ...(mainImageUrl ? [{ url: mainImageUrl, alt: "Imagen principal" }] : []),
+        ...extraImageUrls.map((url, idx) => ({ url, alt: `Imagen ${idx + 1}` })),
+      ],
+      specifications: specifications.map((s) => ({ name: s.name, value: s.value })),
+      benefits: benefits.map((b) => ({ value: b.value, benefit_type: b.benefit_type })),
+      compatibilities: compatibilities.map((c) => ({ value: c.value })),
+    }
+  }, [
+    benefits,
+    compatibilities,
+    formData.description,
+    formData.name,
+    formData.original_price,
+    formData.price,
+    formData.sku,
+    formData.stock,
+    images,
+    isNew,
+    mainImage,
+    mainImageExist,
+    selectedBrand?.name,
+    selectedCategory?.name,
+    specifications,
+  ])
   useEffect(() => {
       const rawUserData = localStorage.getItem("user_data")
       const rawClientData = localStorage.getItem("tenant_data")
-      const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
+      const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
       if (tenant_data.styles_site){
         setThirdBackgroundColor(tenant_data.styles_site.third_background_color)
         setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -134,11 +183,12 @@ export default function EditProductPage() {
         if (product) {
           setFormData({
             name: product.name,
-            description: product.description,
+            description: product.description ?? "",
             original_price: product.original_price.toString(),
             price: product.price.toString(),
             stock: product.stock.toString(),
             sku: product.sku,
+            is_new: product.is_new ? "true" : "false",
           })
           const category = parsedCategories.filter(cat => cat.id == Number(product.category))
           setSelectedCategory(category[0])
@@ -155,7 +205,7 @@ export default function EditProductPage() {
 
             product.features.forEach((f) => {
               const featureId = f.feature.id
-              const detailIds = f.feature.detail.map((d) => d.id)
+              const detailIds = f.feature.detail.map((d) => String(d.id))
               attributes[featureId] = detailIds
             })
 
@@ -170,8 +220,9 @@ export default function EditProductPage() {
           if (product.benefits && product.benefits.length > 0) {
             setBenefits(product.benefits)
           }
-          if (product.brand_data) {
-            setSelectedBrand(product.brand_data)
+          const brandData = (product as any).brand_data as Brand | undefined
+          if (brandData) {
+            setSelectedBrand(brandData)
           }
           setIsNew(product.is_new)
         }
@@ -180,6 +231,11 @@ export default function EditProductPage() {
       }
     }
   }, [productId])
+
+  const handleClick = (route: string) => {
+    setisLoading(true)
+    router.push(route)
+  }
 
   const handleMainImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -209,7 +265,10 @@ export default function EditProductPage() {
     setImages(images.filter((_, i) => i !== index))
     const imageToDelete = existingImages[index]
     if (imageToDelete) {
-      setDeletedImagePublicIds((prev) => [...prev, imageToDelete.public_id])
+      const publicId = imageToDelete.public_id
+      if (typeof publicId === "string" && publicId.trim().length > 0) {
+        setDeletedImagePublicIds((prev) => [...prev, publicId])
+      }
       setExistingImages(existingImages.filter((_, i) => i !== index))
     }
   }
@@ -225,7 +284,7 @@ export default function EditProductPage() {
     if (selectedBrand) {
       brand_id = selectedBrand.id
     }
-    const updatedProduct: Product = {
+    const updatedProduct = {
       name: formData.name,
       description: formData.description,
       price: parseFloat(formData.price),
@@ -248,7 +307,7 @@ export default function EditProductPage() {
       benefits: benefits,
       delete_benefits: JSON.stringify(deletedBenefitsIds),
       brand: brand_id,
-    }
+    } as any as Product
     const res = await ProductsService.updateProduct(updatedProduct, productId)
 
     if (res.success && res.data) {
@@ -292,10 +351,6 @@ export default function EditProductPage() {
     setSelectedBrand(brand)
   }
 
-  const handleClick = (route) => {
-    setisLoading(true);
-    router.push(route)
-  }
 
   const addCompatibility = () => {
     const newCompatibility: ProductCompatibilitiesGroup = {
@@ -716,7 +771,7 @@ export default function EditProductPage() {
                             <div className="relative w-full h-40">
                               <img
                                 // src={URL.createObjectURL(mainImage)}
-                                src={mainImageExist ? mainImageExist : URL.createObjectURL(mainImage)}
+                                src={mainImageExist ? mainImageExist : (mainImage ? URL.createObjectURL(mainImage) : "")}
                                 alt="Imagen principal"
                                 className="w-full h-full object-cover rounded-lg border"
                               />
@@ -769,7 +824,11 @@ export default function EditProductPage() {
                           {images.map((image, index) => (
                             <div key={index} className="relative">
                               <img
-                                src={image.url ? image.url : URL.createObjectURL(image)}
+                                src={
+                                  (image as ProductImage)?.url
+                                    ? (image as ProductImage).url
+                                    : (image instanceof File ? URL.createObjectURL(image) : "")
+                                }
                                 alt={`Imagen ${index + 1}`}
                                 className="w-full h-32 object-cover rounded-lg border"
                               />
@@ -791,6 +850,15 @@ export default function EditProductPage() {
                 </Card>
 
                 <div className="flex justify-end space-x-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsPreviewOpen(true)}
+                    className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    Preview
+                  </Button>
                   <Button type="button" variant="outline"
                   onClick={() => (handleClick("/dashboard/ecommerce/products"))}
                   className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
@@ -803,6 +871,8 @@ export default function EditProductPage() {
                     Guardar Cambios</Button>
                 </div>
               </form>
+
+              <ProductPreviewModal open={isPreviewOpen} onOpenChange={setIsPreviewOpen} data={previewData} />
             </div>
           </div>
         </div>

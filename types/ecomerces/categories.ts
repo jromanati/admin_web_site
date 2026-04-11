@@ -4,18 +4,21 @@ export interface Category {
   description: string
   products_count: number
   status: "active" | "inactive"
-  parent?: string | null
+  parent?: number | null
   is_active?: boolean
+  principal_image?: File | null
+  image_url?: string | null
   subcategories?: Category[]
 }
 
 export interface CategoryResponse {
-  id: string
+  id: number
   name: string
   description: string
   products_count: number
   status: "active" | "inactive"
-  parent?: string
+  parent?: number | null
   is_active?: boolean
+  image_url?: string | null
   subcategories?: Category[]
 }

@@ -30,7 +30,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
   useEffect(() => {
       const rawUserData = localStorage.getItem("user_data")
       const rawClientData = localStorage.getItem("tenant_data")
-      const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
+      const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
       setIsLoading(false)
       if (tenant_data.styles_site){
         setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -50,67 +50,74 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
     const hit = Object.keys(dict).find(k => k.toLowerCase() === key);
     return hit ? dict[hit] : fallback;
   };
-  function mapEnumValue<
-    T extends Record<string, string>,
-    K extends keyof T = keyof T
-  >(input: string | undefined | null, Enum: T, fallbackKey: K): T[K] {
-    if (!input) return Enum[fallbackKey]
-
-    // 1) Si viene la clave del enum (p. ej. "DEPARTAMENTO_AMOBLADO")
-    if (input in Enum) {
-      return Enum[input as keyof T]
-    }
-
-    // 2) Si viene el valor del enum (p. ej. "Departamento amoblado")
-    const foundValue = (Object.values(Enum) as string[]).find(
+  const mapEnumValue = (input: string | undefined | null, Enum: Record<string, string>, fallback: string) => {
+    if (!input) return fallback
+    if (input in Enum) return Enum[input]
+    const foundValue = Object.values(Enum).find(
       (v) => v.toLowerCase() === String(input).toLowerCase()
     )
-    if (foundValue) return foundValue as T[K]
-
-    // 3) Fallback
-    return Enum[fallbackKey]
+    return foundValue || fallback
   }
 
   useEffect(() => {
-    const properties = localStorage.getItem("properties")
     if (mode === "edit" && propertyId) {
-      const raw = localStorage.getItem("properties");
-      if (!raw) return;
-      const list: any[] = JSON.parse(raw);
-      const prop = list.find(p => String(p.id) === String(propertyId));
-      if (!prop) return;
-      setInitialData({
-        title: prop.title ?? "",
-        code: prop.code ?? "",
-        published: !!prop.published,
-        featured: !!prop.featured,
-        show_map: !!prop.show_map,
-        map_src: prop.map_src ?? "",
-        built_area: numOrUndef(prop.built_area),
-        land_area: numOrUndef(prop.land_area),
-        electricity: !!prop.electricity,
-        water: prop.water ?? "",
-        description: prop.description ?? "",
-        amenities: prop.amenities ?? "",
-        characteristics: prop.characteristics ?? "",
-        price: numOrUndef(prop.price),
-        currency: prop.currency ?? "CLP",
-        price_type: mapEnum(prop.price_type, PriceTypeEnum, "FIJO"),
-        property_type: mapEnumValue(prop.property_type, PropertyTypeEnum, "CASA"),
-        property_state: mapEnum(prop.property_state, PropertyStateEnum, "Disponible"),
-        operation:  mapEnum(prop.operation, OperationEnum, "VENTA"),
-        state: mapEnum(prop.state, StateEnum, "Nueva"),
-        bedrooms: numOrUndef(prop.bedrooms),
-        bathrooms: numOrUndef(prop.bathrooms),
-        region: prop.region ?? "",
-        commune: prop.commune ?? "",
-        address: prop.address ?? "",
-        parking: numOrUndef(prop.parking),
-        storage: !!prop.storage,
-        mainImage: prop.image_url,
-        images: prop.images,
-        video: prop.video_url ?? null,
-      });
+      let cancelled = false
+      setIsLoading(true)
+
+      ;(async () => {
+        const idNum = Number(propertyId)
+        if (!Number.isFinite(idNum)) {
+          setIsLoading(false)
+          return
+        }
+
+        const res = await PropertiesService.getPropertyById(idNum)
+        if (cancelled) return
+
+        if (!res.success || !res.data) {
+          setIsLoading(false)
+          return
+        }
+
+        const prop: any = res.data as any
+        setInitialData({
+          title: prop.title ?? "",
+          code: prop.code ?? "",
+          published: !!prop.published,
+          featured: !!prop.featured,
+          show_map: !!prop.show_map,
+          map_src: prop.map_src ?? "",
+          built_area: numOrUndef(prop.built_area),
+          land_area: numOrUndef(prop.land_area),
+          electricity: !!prop.electricity,
+          water: prop.water ?? "",
+          description: prop.description ?? "",
+          amenities: prop.amenities ?? "",
+          characteristics: prop.characteristics ?? "",
+          price: numOrUndef(prop.price),
+          currency: prop.currency ?? "CLP",
+          price_type: mapEnum(prop.price_type, PriceTypeEnum as any, "FIJO") as any,
+          property_type: mapEnumValue(prop.property_type, PropertyTypeEnum as any, "CASA") as any,
+          property_state: mapEnum(prop.property_state, PropertyStateEnum as any, "DISPONIBLE") as any,
+          operation: mapEnum(prop.operation, OperationEnum as any, "VENTA") as any,
+          state: mapEnum(prop.state, StateEnum as any, "NUEVA") as any,
+          bedrooms: numOrUndef(prop.bedrooms),
+          bathrooms: numOrUndef(prop.bathrooms),
+          region: prop.region ?? "",
+          commune: prop.commune ?? "",
+          address: prop.address ?? "",
+          parking: numOrUndef(prop.parking),
+          storage: !!prop.storage,
+          mainImage: prop.image_url,
+          images: prop.images,
+          video: prop.video_url ?? null,
+        })
+        setIsLoading(false)
+      })()
+
+      return () => {
+        cancelled = true
+      }
     }
     else{
       setInitialData({
@@ -129,11 +136,11 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
         characteristics: "",
         price: 0,
         currency: "CLP",
-        price_type: "Fijo",
-        property_type: "Casa",
-        property_state: "Disponible",
-        operation:  "Venta",
-        state: "Nueva",
+        price_type: PriceTypeEnum.FIJO,
+        property_type: PropertyTypeEnum.CASA,
+        property_state: PropertyStateEnum.DISPONIBLE,
+        operation:  OperationEnum.VENTA,
+        state: StateEnum.NUEVA,
         bedrooms: 0,
         bathrooms: 0,
         region: "",
@@ -148,7 +155,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
     }
   }, [mode, propertyId])
 
-  const handleSubmit = async (data: React.FormEvent) => {
+  const handleSubmit = async (data: Property & any) => {
     const isValid = AuthService.isTokenValid()
     if (!isValid) {
       const isRefreshValid = await AuthService.isRefreshTokenValid()
@@ -232,6 +239,7 @@ export function PropertyFormPage({ propertyId, mode }: PropertyFormPageProps) {
             <div className="max-w-4xl mx-auto">
               <PropertyFormComponent
                 initialData={initialData}
+                propertyId={propertyId}
                 onSubmit={handleSubmit}
                 onCancel={handleCancel}
                 isSending={isSending}

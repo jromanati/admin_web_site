@@ -1,13 +1,13 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { ArrowLeft, Upload, X, Plus, Trash2 } from "lucide-react"
+import { ArrowLeft, Upload, X, Plus, Trash2, Eye } from "lucide-react"
 import { CategorySelector } from "@/components/ecommerce/category-selector"
 import { AttributesSelector } from "@/components/ecommerce/attributes-selector"
 import { AdminSidebar } from "@/components/admin-sidebar"
@@ -22,6 +22,8 @@ import useSWR, { mutate } from "swr"
 import { BrandSelector } from "@/components/ecommerce/brand-selector"
 import { useRouter } from "next/navigation"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ProductPreviewModal } from "@/components/ecommerce/product-preview-modal"
+import type { Brand } from "@/types/ecomerces/brands"
 
 interface CreateProductPageProps {
   params: {
@@ -32,13 +34,6 @@ interface Specification {
   id: string
   name: string
   value: string
-}
-
-interface Brand {
-  id: string
-  name: string
-  logo_url?: string
-  is_active: boolean
 }
 
 export default function CreateProductPage() {
@@ -77,11 +72,12 @@ export default function CreateProductPage() {
   const [hasAtributes, setHasAtributes] = useState(false)
   
   const [isNew, setIsNew] = useState(false)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
 
   useEffect(() => {
       const rawUserData = localStorage.getItem("user_data")
       const rawClientData = localStorage.getItem("tenant_data")
-      const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
+      const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
       if (tenant_data.styles_site){
         setThirdBackgroundColor(tenant_data.styles_site.third_background_color)
         setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -144,7 +140,7 @@ export default function CreateProductPage() {
       arr.forEach((id) => featuresDetailIds.push(Number(id)))
     })
 
-    const product: Product = {
+    const product = {
       name: formData.name,
       description: formData.description,
       price: parseFloat(formData.price),
@@ -161,7 +157,8 @@ export default function CreateProductPage() {
       specifications: specifications,
       compatibilities: compatibilities,
       benefits: benefits,
-    }
+      brand: selectedBrand?.id ?? "",
+    } as any as Product
     if (!product.category){
       setErrors("* Debe asignar una categoría")
       return
@@ -214,7 +211,7 @@ export default function CreateProductPage() {
     setSelectedBrand(brand)
   }
   const router = useRouter()
-  const handleClick = (route) => {
+  const handleClick = (route: string) => {
     setisLoading(true);
     router.push(route)
   }
@@ -252,6 +249,46 @@ export default function CreateProductPage() {
     setBenefits(benefits.filter((spec) => spec.id !== id))
   }
 
+  const previewData = useMemo(() => {
+    const mainImageUrl = mainImage ? URL.createObjectURL(mainImage) : undefined
+    const extraImageUrls = images.map((img) => URL.createObjectURL(img))
+
+    return {
+      name: formData.name,
+      description: formData.description,
+      price: formData.price ? Number(formData.price) : null,
+      original_price: formData.original_price ? Number(formData.original_price) : (formData.price ? Number(formData.price) : null),
+      stock: formData.stock ? Number(formData.stock) : null,
+      sku: formData.sku,
+      brand_name: selectedBrand?.name,
+      category_name: selectedCategory?.name,
+      is_new: isNew,
+      is_active: true,
+      images: [
+        ...(mainImageUrl ? [{ url: mainImageUrl, alt: "Imagen principal" }] : []),
+        ...extraImageUrls.map((url, idx) => ({ url, alt: `Imagen ${idx + 1}` })),
+      ],
+      specifications: specifications.map((s) => ({ name: s.name, value: s.value })),
+      benefits: benefits.map((b) => ({ value: b.value, benefit_type: b.benefit_type })),
+      compatibilities: compatibilities.map((c) => ({ value: c.value })),
+    }
+  }, [
+    benefits,
+    compatibilities,
+    formData.description,
+    formData.name,
+    formData.original_price,
+    formData.price,
+    formData.sku,
+    formData.stock,
+    images,
+    isNew,
+    mainImage,
+    selectedBrand?.name,
+    selectedCategory?.name,
+    specifications,
+  ])
+
 
   return (
     <div className="min-h-screen bg-background">
@@ -280,7 +317,6 @@ export default function CreateProductPage() {
             </div>
 
             <div className="px-4 sm:px-6 lg:px-8 py-8">
-              <div className="max-w-4xl mx-auto">
                 <form onSubmit={handleSubmit} className="space-y-8">
                   <p className="text-red-400 text-sm">{errors}</p>
                   <Card className={`${secondBackgroundColor} ${principalText} `}>
@@ -707,6 +743,15 @@ export default function CreateProductPage() {
                     <Button
                       type="button"
                       variant="outline"
+                      onClick={() => setIsPreviewOpen(true)}
+                      className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
+                    >
+                      <Eye className="h-4 w-4 mr-2" />
+                      Preview
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
                       onClick={() => (handleClick("/dashboard/ecommerce/products"))}
                       className={`${secondBackgroundColor} ${principalText} ${principalHoverBackground}`}
                     >
@@ -719,7 +764,8 @@ export default function CreateProductPage() {
                     </Button>
                   </div>
                 </form>
-              </div>
+
+                <ProductPreviewModal open={isPreviewOpen} onOpenChange={setIsPreviewOpen} data={previewData} />
             </div>
           </div>
         </div>

@@ -18,6 +18,7 @@ import { Progress } from "@/components/ui/progress"
 import { AdminLayout } from "../admin-layout"
 import { PropertiesService } from "@/services/properties/properties.service"
 import { AuthService } from "@/services/auth.service"
+import { AICreditsUsageCard, AICreditsHistoryCard, AICreditsCompactCard } from "./ai-credits-dashboard"
 
 interface PropertiesDashboardProps {
   siteId: string
@@ -54,13 +55,18 @@ export function PropertiesDashboard({ siteId }: PropertiesDashboardProps) {
   const [secondBackgroundColor, setSecondBackgroundColor] = useState("")
   const [principalText, setPrincipalText] = useState("")
   const [isLoading, setisLoading] = useState(true)
+  const [hasIA, setHasIA] = useState(false)
   useEffect(() => {
     const isValid = AuthService.isTokenValid()
     if (isValid) {
       isTokenValid = true
     }
     const rawClientData = localStorage.getItem("tenant_data")
-    const tenant_data = rawClientData ? JSON.parse(rawClientData) : null    
+    const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
+    const extra_modules = tenant_data ? tenant_data.extras_modules : []
+    if (extra_modules && extra_modules.length > 0){
+      setHasIA(extra_modules.includes("ia_module"))
+    }
     if (tenant_data.styles_site){
       setSecondBackgroundColor("bg-red-900")
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
@@ -213,6 +219,12 @@ export function PropertiesDashboard({ siteId }: PropertiesDashboardProps) {
                   </p>
                 </CardContent>
               </Card>
+              
+              {hasIA && <AICreditsCompactCard />}
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 mb-8">
+              {hasIA && <AICreditsUsageCard />}
+              {hasIA && <AICreditsHistoryCard />}
             </div>
 
             {/* Recent Activity and Top Properties */}

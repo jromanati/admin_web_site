@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { AIService } from "@/services/ai.service"
@@ -26,6 +26,14 @@ type AnalysisResult = {
 }
 
 export default function AIImagePipelinePage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <AIImagePipelinePageInner />
+    </Suspense>
+  )
+}
+
+function AIImagePipelinePageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
 

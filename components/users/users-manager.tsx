@@ -24,7 +24,7 @@ import type {User} from "@/types/users"
 
 interface UsersManagerProps {
   siteId: string
-  siteType: "ecommerce" | "properties" | "excursions"
+  siteType: "ecommerce" | "properties" | "excursions" | "eventhub"
 }
 
 const mockUsers = [

@@ -30,6 +30,7 @@ export function LoginForm() {
     "ecomercer": "/dashboard/ecommerce",
     "properties": "/dashboard/properties",
     "excursions": "/dashboard/excursions",
+    "eventhub": "/dashboard/eventhub",
   }
   useEffect(() => {
     localStorage.setItem("schema_name", "")
@@ -37,6 +38,7 @@ export function LoginForm() {
     localStorage.setItem("categories", "")
     localStorage.setItem("features", "")
     localStorage.setItem("properties", "")
+    localStorage.setItem("event_profiles", "")
   }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,8 +55,10 @@ export function LoginForm() {
       const user = users[email as keyof typeof users]
       if (response.success) {
         const client_type = response.data?.tenant?.client_type || "ecommerce"
+        console.log("client_type", client_type)
         const redirectUrl = clients[client_type] || "/dashboard/ecommerce"
         // Store user type in localStorage for future use
+        console.log("redirectUrl", redirectUrl)
         localStorage.setItem("userType", client_type)
         localStorage.setItem("userEmail", response.data.user.email || email)
         // Redirect to specific dashboard

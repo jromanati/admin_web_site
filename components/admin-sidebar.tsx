@@ -8,6 +8,7 @@ import {
   Tag,
   ShoppingCart,
   Users,
+  User,
   TrendingUp,
   LogOut,
   Building,
@@ -25,11 +26,13 @@ import {
   Star,
   Video,
   HelpCircle,
-  FileText
+  FileText,
+  BookOpen,
+  Truck
 } from "lucide-react"
 
 interface AdminSidebarProps {
-  siteType: "ecommerce" | "properties" | "excursions"
+  siteType: "ecommerce" | "properties" | "excursions" | "eventhub"
   siteId: string | undefined
   siteName: string
   currentPath?: string
@@ -38,8 +41,8 @@ import { AuthService } from "@/services/auth.service"
 import InstallPWA from "@/components/pwa/InstallPWA";
 export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true)
-  const [tenant_data, setTenantData] = useState(false)
-  const [user_data, setUserData] = useState(false)
+  const [tenant_data, setTenantData] = useState<any>(null)
+  const [user_data, setUserData] = useState<any>(null)
   const [backgroundColor, setBackgroundColor] = useState("")
   const [secondBackgroundColor, setSecondBackgroundColor] = useState("")
   const [principalHoverBackground, setPrincipalHoverBackground] = useState("")
@@ -49,6 +52,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
   const [hasStreaming, setHasStreaming] = useState(false)
   const [hasAtributes, setHasAtributes] = useState(false)
   const [hasBlogs, setHasBlogs] = useState(false)
+  const [hasShippingCost, setHasShippingCost] = useState(false)
 
 
   useEffect(() => {
@@ -57,7 +61,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
     setUserData(user_data)
     const rawClientData = localStorage.getItem("tenant_data")
     
-    const tenant_data = rawUserData ? JSON.parse(rawClientData) : null
+    const tenant_data = rawClientData ? JSON.parse(rawClientData) : null
     setTenantData(tenant_data)
     const extra_modules = tenant_data ? tenant_data.extras_modules : []
     console.log(extra_modules, 'extra_modules')
@@ -66,9 +70,10 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
       setHasStreaming(extra_modules.includes("streaming"))
       setHasAtributes(extra_modules.includes("attributes"))
       setHasBlogs(extra_modules.includes("blogs"))
+      setHasShippingCost(extra_modules.includes("shippingcost"))
     }
     
-    if (tenant_data.styles_site){
+    if (tenant_data?.styles_site){
       setBackgroundColor(tenant_data.styles_site.background_color)
       setSecondBackgroundColor(tenant_data.styles_site.second_background_color)
       setPrincipalHoverBackground(tenant_data.styles_site.principal_hover_background)
@@ -77,7 +82,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
   }, [])
   // const backgroundColor = "bd-card"
   const router = useRouter()
-  const handleClick = (route) => {
+  const handleClick = (route: string) => {
     // ... lógica previa si la necesitas
     router.push(route)
   }
@@ -140,6 +145,15 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
         },
       )
     }
+    if (hasShippingCost) {
+      extraModuleItems.push(
+        {
+          icon: Truck,
+          label: "Costos de Envío",
+          href: `/dashboard/ecommerce/shipping-costs`,
+        },
+      )
+    }
 
     switch (siteType) {
       case "ecommerce":
@@ -174,6 +188,11 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
             icon: Users,
             label: "Gestionar Usuarios",
             href: `/dashboard/ecommerce/users`,
+          },
+          {
+            icon: HelpCircle,
+            label: "Ayuda",
+            href: `/dashboard/ecommerce/help`,
           }
         ]
 
@@ -236,6 +255,45 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
           ...baseItems,
         ]
 
+      case "eventhub":
+        return [
+          {
+            icon: LayoutDashboard,
+            label: "Inicio",
+            href: `/dashboard/eventhub`,
+          },
+          {
+            icon: MapPin,
+            label: "Mesas",
+            href: `/dashboard/eventhub/tables`,
+          },
+          {
+            icon: Calendar,
+            label: "Grupos de Invitados",
+            href: `/dashboard/eventhub/guest-groups`,
+          },
+          {
+            icon: User,
+            label: "Invitados",
+            href: `/dashboard/eventhub/guests`,
+          },
+          {
+            icon: UserCheck,
+            label: "Acompañantes",
+            href: `/dashboard/eventhub/companions`,
+          },
+          {
+            icon: BookOpen,
+            label: "Gestión de Álbumes",
+            href: `/dashboard/eventhub/album_gestion`,
+          },
+          {
+            icon: Users,
+            label: "Gestionar Usuarios",
+            href: `/dashboard/eventhub/users`,
+          },
+        ]
+
       default:
         return baseItems
     }
@@ -251,6 +309,8 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
         return <Building className="h-5 w-5" />
       case "excursions":
         return <MapPin className="h-5 w-5" />
+      case "eventhub":
+        return <Calendar className="h-5 w-5" />
       default:
         return <Package className="h-5 w-5" />
     }
@@ -264,6 +324,8 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
         return "Propiedades"
       case "excursions":
         return "Excursiones"
+      case "eventhub":
+        return "EventHub"
       default:
         return "Dashboard"
     }
@@ -312,8 +374,8 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
           <div className="p-6 border-b border-border">
             <div className="flex items-center space-x-3">
               <div>
-                <h2 className="text-lg font-semibold text-foreground">{tenant_data.name}</h2>
-                <h2 className="text-lg font-semibold text-foreground">{user_data.first_name} {user_data.last_name}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{tenant_data?.name}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{user_data?.first_name} {user_data?.last_name}</h2>
               </div>
             </div>
           </div>
@@ -321,7 +383,7 @@ export function AdminSidebar({ siteType, siteId, siteName, currentPath }: AdminS
           {/* Navigation */}
           <nav className="flex-1 p-4">
             <div className="space-y-2">
-              {menuItems.map((item) => {
+              {menuItems.map((item: any) => {
                 const Icon = item.icon
                 const isActive = currentPath === item.href
 

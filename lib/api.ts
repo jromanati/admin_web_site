@@ -105,12 +105,12 @@ class ApiClient {
     }
     const schema = localStorage.getItem("schema_name")
     // local
-    // const host = window.location.hostname.includes("localhost") ? "localhost:8000" : "api.autopartes.cl"
-    // return schema ? `http://${schema}.${host}/api/` : DEFAULT_API_BASE
+    const host = window.location.hostname.includes("localhost") ? "localhost:8000" : "api.autopartes.cl"
+    return schema ? `http://${schema}.${host}/api/` : DEFAULT_API_BASE
     // Produccion
-    const DEFAULT_API_BASE_PROD = "https://base.sitios.softwarelabs.cl/api/"
-    const host = "sitios.softwarelabs.cl"
-    return schema ? `https://${schema}.${host}/api/` : DEFAULT_API_BASE_PROD
+    // const DEFAULT_API_BASE_PROD = "https://base.sitios.softwarelabs.cl/api/"
+    // const host = "sitios.softwarelabs.cl"
+    // return schema ? `https://${schema}.${host}/api/` : DEFAULT_API_BASE_PROD
 
     // TELEFONO
     // const host2 = "192.168.1.81.nip.io:8000"
@@ -156,6 +156,10 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
       const url = `${this.baseUrl}${endpoint}`
+      console.log("API Request URL:", url)
+      console.log("API Request Method:", options.method || "GET")
+      console.log("API Base URL:", this.baseUrl)
+      
       const token = localStorage.getItem("token")
 
       const mergedHeaders: HeadersInit = {
@@ -167,6 +171,8 @@ class ApiClient {
         ...options,
         headers: mergedHeaders,
       })
+
+      console.log("API Response Status:", response.status)
 
       if (response.status === 401 && !(options as any)?.__retry) {
         const refreshed = await this.refreshAccessToken()
@@ -252,6 +258,23 @@ class ApiClient {
 
   delete<T>(endpoint: string, headers?: Record<string, string>, options?: RequestInit) {
     return this.request<T>(endpoint, { ...(options || {}), method: "DELETE", headers })
+  }
+
+  patch<T>(endpoint: string, body?: any, headers?: Record<string, string>, options?: RequestInit) {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData
+
+    return this.request<T>(endpoint, {
+      ...(options || {}),
+      method: "PATCH",
+      body: isFormData ? body : body ? JSON.stringify(body) : undefined,
+      headers: {
+        ...(isFormData
+          ? {} // No ponemos Content-Type si es FormData
+          : { "Content-Type": "application/json" }),
+        Accept: "application/json",
+        ...(headers || {}),
+      },
+    })
   }
 }
 

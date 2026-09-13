@@ -6,7 +6,7 @@ import { AdminSidebar } from "./admin-sidebar"
 
 interface AdminLayoutProps {
   children: React.ReactNode
-  siteType: "ecommerce" | "properties" | "excursions"
+  siteType: "ecommerce" | "properties" | "excursions" | "eventhub"
   siteId: string
   siteName: string
   currentPath?: string

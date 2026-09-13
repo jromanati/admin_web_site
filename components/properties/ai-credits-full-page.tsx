@@ -584,7 +584,7 @@ export function AICreditsFullPage({ siteId }: AICreditsFullPageProps) {
                 <span className="text-muted-foreground flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   {usage?.counter_reset_at ? (
-                    <>Se reinicia el {new Date(usage.counter_reset_at).toLocaleDateString("es-CL", { day: "numeric", month: "long" })}</>
+                    <>Se reinicia el {new Date(usage.monthly_counter_reset_at).toLocaleDateString("es-CL", { day: "numeric", month: "long" })}</>
                   ) : (
                     <>Sin fecha de reinicio</>
                   )}

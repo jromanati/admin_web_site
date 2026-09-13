@@ -1,12 +1,14 @@
 import { SiteDashboard } from "@/components/site-dashboard"
+import { use } from "react"
 
 interface SiteDashboardPageProps {
-  params: {
+  params: Promise<{
     type: string
     id: string
-  }
+  }>
 }
 
 export default function SiteDashboardPage({ params }: SiteDashboardPageProps) {
-  return <SiteDashboard siteType={params.type} siteId={params.id} />
+  const resolvedParams = use(params)
+  return <SiteDashboard siteType={resolvedParams.type} siteId={resolvedParams.id} />
 }
